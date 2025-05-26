@@ -11,16 +11,26 @@
 #include <netinet/in.h>
 
 /* global variables (yippeee) */
-int isLeader = 0;
+int sockself; 				// socket for the server itself
+int sockmain; 				// client for leader, leader for backup.
+int sockbackup[255]; 	// leader keeps sockets here.
+FILE* db; 						// database file 
+FILE* logs; 					// log file
 
 
 /* For backup servers */
+
+// start backup server
+int startBackup(int port);
 
 // Connect to a leader.
 int connectLeader(char* addr, int port);
 
 
 /* For leader servers */
+
+// start leader server
+int startLeader(int port);
 
 // send changes to backup servers
 int giveChanges(char* key, char* value);
@@ -30,7 +40,6 @@ int giveLogs(char* filepath);
 
 // send database to backup servers
 int givedb(char* filepath);
-
 
 /* For both */ 
 
