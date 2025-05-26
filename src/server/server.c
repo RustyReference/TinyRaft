@@ -4,7 +4,29 @@
 /* For backup servers */
 
 // start the backup server
-int startBackup(int port);
+int startBackup(char* address, int port) {
+	struct in_addr ipLeader;
+	if(!inet_aton(address, &ipLeader)) {
+		fprintf(stderr, "Invalid ip address %s\n", address);
+		return 1;
+	}
+
+	// setup a socket
+	sockmain = socket(AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	addr.sin_addr.s_addr = ipLeader.s_addr;
+	
+	// connect to leader
+	if(connect(port, (struct sockaddr*)&addr, sizeof(addr))) {
+		fprintf(stderr, "Cannot connect to port %d\n", port);
+		return 0;
+	}
+
+	// success
+	return 1;
+}
 
 // Connect to a leader.
 int connectLeader(char* addr, int port);

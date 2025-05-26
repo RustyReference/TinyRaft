@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 
 /* global variables (yippeee) */
@@ -21,7 +22,7 @@ FILE* logs; 					// log file
 /* For backup servers */
 
 // start backup server
-int startBackup(int port);
+int startBackup(char* address, int port);
 
 // Connect to a leader.
 int connectLeader(char* addr, int port);
