@@ -11,12 +11,20 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+/* Type Definition of Entries */
+typedef struct Entry {
+    struct Entry    *prev;
+    struct Entry    *next;
+    char            *key;
+    char            *val;
+} Entry;
+
 /* global variables (yippeee) */
-int sockself; 				// socket for the server itself
-int sockmain; 				// client for leader, leader for backup.
-int sockbackup[255]; 	// leader keeps sockets here.
-FILE* db; 						// database file 
-FILE* logs; 					// log file
+int     sockself; 				// socket for the server itself
+int     sockmain; 				// client for leader, leader for backup.
+int     sockbackup[255];    	// leader keeps sockets here.
+FILE*   db; 					// database file 
+FILE*   logs; 				    // log file
 
 
 /* For backup servers */

@@ -5,21 +5,23 @@
 
 // start the backup server
 int startBackup(char* address, int port) {
+	struct sockaddr_in addr;
 	struct in_addr ipLeader;
+	
+	// Converts the given address to a network-byte-order form
 	if(!inet_aton(address, &ipLeader)) {
 		fprintf(stderr, "Invalid ip address %s\n", address);
 		return 1;
 	}
 
-	// setup a socket
-	sockmain = socket(AF_INET, SOCK_STREAM, 0);
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-	addr.sin_addr.s_addr = ipLeader.s_addr;
+	// Sets up a socket
+	sockmain 				= socket(AF_INET, SOCK_STREAM, 0);
+	addr.sin_family 		= AF_INET;
+	addr.sin_port 			= htons(port);
+	addr.sin_addr.s_addr 	= ipLeader.s_addr; 
 	
-	// connect to leader
-	if(connect(port, (struct sockaddr*)&addr, sizeof(addr))) {
+	// Connect to leader
+	if(connect(sockmain, (struct sockaddr*)&addr, sizeof(addr))) {
 		fprintf(stderr, "Cannot connect to port %d\n", port);
 		return 0;
 	}
@@ -86,7 +88,7 @@ int initServer(int port, int leader, char pathLogs[255], char pathdb[255], char 
 
 	// start the server
 	int serverStatus = 0;
-	if(leader) {
+	if (leader) {
 		status = startLeader(port);
 	} else {
 		status = startBackup(port);
