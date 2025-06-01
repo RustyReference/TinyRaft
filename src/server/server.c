@@ -104,3 +104,4 @@ int initServer(int port, int leader, char pathLogs[255], char pathdb[255], char 
 
 // write to db
 int writedb(char* key, char* value);
+
