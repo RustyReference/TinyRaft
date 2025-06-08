@@ -28,7 +28,7 @@ int llistAdd(struct llist* list, void* data) {
 		tail->next = (struct node*)malloc(sizeof(struct node));
 		tail = tail->next;
 	}
-	if(!list->first) { list->first = list->last; }
+	if(!list->first) { list->first = tail; }
 
 	// insert the data and return
 	tail->next = NULL; 
