@@ -1,3 +1,6 @@
+#ifndef KV_STORE_H
+#define KV_STORE_H
+
 #define TABLE_SiZE 100
 
 typedef struct entry {
@@ -19,3 +22,4 @@ void kv_delete(const char* key);
 
 void print();
 
+#endif
