@@ -1,0 +1,41 @@
+.TH initServer 3 2025-06-19 "server manpages"
+
+.SH NAME
+initServer
+\-
+Initialize a server.
+
+.SH FILES
+.RI ( server.h ", " server.c)
+
+.SH SYNOPSIS
+.nf
+.B #include "server.h"
+.P
+.BI "void initServer(void);"
+.BI "void termServer(void);"
+.fi
+
+.SH DESCRIPTION
+initServer function initializes global variables and mutexes needed to use server.h library. Meanwhile termServer() function frees global pointers and mutexes.
+
+.SH NOTES
+Don't forget to call
+.RI termServer(); 
+once done with the library.
+
+.EX 
+int main() {
+.B 	initServer();
+
+	struct ServInfo info;
+	getLeader(&info, 9600);
+
+	struct ServThread* leaderThread = procLeader(info);
+	ServThreadFree(&leaderThread);
+	
+.B 	termServer();
+	return 0;
+}
+
+.NOTES
