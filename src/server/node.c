@@ -57,7 +57,7 @@ int populate_peers(Config *given, char *option) {
 		return 1;
 	}
 
-	token = strtok(given, ",");
+	token = strtok(option, ",");
 	while (token != NULL) {
 		int npeers = given->num_peers;
 		given->peers = realloc(given->peers, sizeof(char *) * (npeers + 1));
@@ -92,26 +92,26 @@ Config parse_args(int argc, char **argv) {
 	while ((code = getopt_long(argc, argv, "i:p:x:", long_opts, &opt_ind))) {
 		switch (code) {
 			case 'i':
-				config.id = optarg;
+				config.id = atoi(optarg);
 				break;
 			case 'p':
-				config.port = optarg;
+				config.port = atoi(optarg);
 				break;
 			case 'x':
 				populate_peers(&config, optarg);
 				break;
+			case -1: // end of args
+				if (config.id == 0 || config.port == 0 || config.num_peers == 0) {
+					fprintf(stderr, "Missing required arguments.\n");
+					exit(EXIT_FAILURE);
+				}
+				return config;
 			default:
 				fprintf(stderr, "Usage: %s --id=<id> --port=<port> --peers=<peers>\n", argv[0]);
 				exit(EXIT_FAILURE);
 		}
 	}
-
-	if (config.id == 0 || config.port == 0 || config.num_peers == 0) {
-		fprintf(stderr, "Missing required arguments.\n");
-		exit(EXIT_FAILURE);
-	}
-	
-	return config;
+	return (Config){0}; // error message
 }
 
 /**
