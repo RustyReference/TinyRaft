@@ -1,23 +1,23 @@
-.TH initServer server 2025-06-19 "server manpages"
+.TH initServer thread 2025-06-19 "thread manpages"
 
 .SH NAME
 initServer
 \-
-Initialize a server.
+Initialize a thread.
 
 .SH FILES
-.RI ( server.h ", " server.c)
+.RI ( thread.h ", " thread.c)
 
 .SH SYNOPSIS
 .nf
-.B #include "server.h"
+.B #include "thread.h"
 .P
 .BI "void initServer(void);"
 .BI "void termServer(void);"
 .fi
 
 .SH DESCRIPTION
-initServer function initializes global variables and mutexes needed to use server.h library. Meanwhile termServer() function frees global pointers and mutexes.
+initServer function initializes global variables and mutexes needed to use thread.h library. Meanwhile termServer() function frees global pointers and mutexes.
 
 .SH NOTES
 Don't forget to call

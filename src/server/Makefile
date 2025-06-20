@@ -3,8 +3,8 @@ CC = gcc -g -Wall -Wextra -Werror
 run: compile
 	./main
 
-compile: main.c server.c leader.h backup.h client.h
-	$(CC) -o main main.c server.c leader.h
+compile: main.c thread/thread.c 
+	$(CC) -o main main.c thread/thread.c server.c
 
 .PHONY: clean
 clean: main

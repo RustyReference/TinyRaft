@@ -1,0 +1,63 @@
+.TH getLeader server 2025-06-20 "server manpages"
+
+.SH NAME
+getLeader
+\-
+All functions to make and interact with a leader server.
+
+.SH FILES
+.RI ( server.h ", " server.c)
+
+.SH SYNOPSIS
+.nf
+.B #include "server.h"
+.P
+.BI "int getLeader(struct ServInfo* " dst ", int " port ");"
+.BI "struct ServThread* procLeader(struct ServInfo " info ");"
+.fi
+
+.SH DESCRIPTION
+getId returns the lowest unique integer every single time. clearId makes that number available again.
+returns -1 on error.
+
+.SH COMMANDS
+Here are the current commands available. 
+Once you run procLeader you can interact with the server by sending these commands to it. There is an example below on how to do that.
+
+.nf
+exit 	- stop processing commands
+greet 	- print 'hello, world' to stdout
+.fi
+
+.SH NOTES
+This is currently in-progress.
+
+.SH EXAMPLE
+.EX
+This program takes commands from stdin and sends them to the leader server. Use "quit" to exit program itself.
+
+#include <stdio.h>
+#include <string.h>
+#include "server.h"
+#include <wait.h>
+
+int main() {
+	initServer();
+
+	struct ServInfo info;
+	getLeader(&info, 9600);
+
+.B		struct ServThread* leaderThread = procLeader(info);
+	char buf[255];
+	while(fgets(buf, 255, stdin)) {
+		*strchrnul(buf, '\\n') = '\\0'; // remove newline at the end. 
+		threadMsgSend(leaderThread->coms, buf, 0);
+		if(strncmp(buf, "quit", 255) == 0) {
+			break;
+		}
+	}
+	ServThreadFree(&leaderThread);
+	
+	termServer();
+	return 0;
+}

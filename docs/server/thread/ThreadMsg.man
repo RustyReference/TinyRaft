@@ -1,3 +1,37 @@
+.TH initServer thread 2025-06-19 "thread manpages"
+
+.SH NAME
+initServer
+\-
+Initialize a thread.
+
+.SH FILES
+.RI ( thread.h ", " thread.c)
+
+.SH SYNOPSIS
+.nf
+.B #include "thread.h"
+.P
+.BI "struct ThreadMsg* ThreadMsgCreat(); "
+.BI "void ThreadMsgFree(struct ThreadMsg** " threadMsg ");"
+.BI "int threadMsgSend(struct ThreadMsg* " coms ", char* " msg ", int " len ");"
+.BI "int threadMsgRecv(struct ThreadMsg* " coms ", char** " buf ");"
+.fi
+
+.SH DESCRIPTION
+ThreadMsg is basically a thread-safe message queue with notifications feature. threadMsgRecv listens
+.IR coms 
+every few seconds unless there is a notification in which case it checks immediately. Then it sets
+.IR buf
+to the message. buf is a new pointer each time, free it.
+
+.SH NOTES
+This might be the most intuitive thing I ever wrote.
+
+.SH EXAMPLE
+This program has a seperate thread printing every message you write along with thread id and what time it got the message. Try with input/output redirection like './main < main.c' to test speed. 
+
+.EX
 #include <stdio.h>
 #include <string.h>
 #include "server.h"

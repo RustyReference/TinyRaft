@@ -26,7 +26,8 @@ MAXID value is 16 by default. Set it higher for more unique ids.
 .SH NOTES
 initServer needed. Check manpage at initServer.man
 
-.EX 
+.SH EXAMPLE
+.EX
 #include "server.h"
 #define MAXID 9
 

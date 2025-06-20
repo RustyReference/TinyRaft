@@ -1,4 +1,4 @@
-.TH queueEntry server 2025-06-20 "server manpages"
+.TH queueEntry thread 2025-06-20 "thread manpages"
 
 .SH NAME
 QueueEntry
@@ -6,11 +6,11 @@ QueueEntry
 Store messages.
 
 .SH FILES
-.RI ( server.h ", " server.c)
+.RI ( thread.h ", " thread.c)
 
 .SH SYNOPSIS
 .nf
-.B #include "server.h"
+.B #include "thread.h"
 .P
 .BI "struct QueueEntry;"
 .BI "struct QueueEntry* QueueEntryCreat(char* _Nullable " msg ", int " len ");"
@@ -26,8 +26,9 @@ QueueEntry holds a message and maxsize.
 .SH NOTES
 You probably wanna check MsgQueue instead.
 
+.SH EXAMPLE
 .EX 
-code below has been copied from server.h
+code below has been copied from thread.h
 struct ThreadMsg* ThreadMsgCreat() {
 	struct ThreadMsg* coms = (struct ThreadMsg*)malloc(sizeof(struct ThreadMsg));
 	if(!coms) {
