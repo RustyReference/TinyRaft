@@ -1,0 +1,52 @@
+.TH MsgQueue server 2025-06-20 "server manpages"
+
+.SH NAME
+MsgQueue
+\-
+Store multiple messages in a queue.
+
+.SH FILES
+.RI ( server.h ", " server.c)
+
+.SH SYNOPSIS
+.nf
+.B #include "server.h"
+.P
+
+.BI "struct MsgQueue* MsgQueueCreat(void);"
+.RI " 	Make and init new MsgQueue. NULL on error."
+
+.BI "void MsgQueueFree(struct MsgQueue** _Nullable " mqueue ");"
+.RI	" 	Free " mqueue " and destroy mutexes. Won't crash if " mqueue " is NULL."
+.RI "" 	mqueue " Will be set to NULL afterwards. " 
+
+.BI "int MsgQueuePush(struct MsgQueue* " mqueue ", char* " msg ", int " len ");"
+.RI	" 	Send " msg " of maxlen " len " to " mqueue " . Set " len " 0 for automatic.
+.RI "" 	msg " can NOT be more than 1024 letters. "
+
+.fi
+
+.SH DESCRIPTION
+MsgQueue is used to hold multiple messages in a queue. You can use all stailq functions on it. 
+
+.SH NOTES
+ThreadMsg is just MsgQueue with mutex and all that good stuff. 
+You can send messages even to the other threads if you use ThreadMsg.
+
+.EX 
+code below has been copied from server.c. 
+
+.P
+struct ThreadMsg* coms = (struct ThreadMsg*)malloc(sizeof(struct ThreadMsg));
+if(!coms) {
+	return NULL;
+}
+
+// setup the message queue
+coms->mqueue = MsgQueueCreat();
+if(!coms->mqueue) {
+	// abort
+	free(coms);
+	return NULL;
+}
+.fi

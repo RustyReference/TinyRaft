@@ -1,0 +1,49 @@
+.TH queueEntry server 2025-06-20 "server manpages"
+
+.SH NAME
+QueueEntry
+\-
+Store messages.
+
+.SH FILES
+.RI ( server.h ", " server.c)
+
+.SH SYNOPSIS
+.nf
+.B #include "server.h"
+.P
+.BI "struct QueueEntry;"
+.BI "struct QueueEntry* QueueEntryCreat(char* _Nullable " msg ", int " len ");"
+	msg is the string that will be copied while len is the max size of buffer.
+	msg can be NULL for empty string. len 0 or less will give default bufsize of 1024.
+.BI "void	QueueEntryFree(struct QueueEntry** _Nullable " entry ");"
+	Will free up a queue entry and set it to NULL. If entry is NULL it won't crash.
+.fi
+
+.SH DESCRIPTION
+QueueEntry holds a message and maxsize. 
+
+.SH NOTES
+You probably wanna check MsgQueue instead.
+
+.EX 
+code below has been copied from server.h
+struct ThreadMsg* ThreadMsgCreat() {
+	struct ThreadMsg* coms = (struct ThreadMsg*)malloc(sizeof(struct ThreadMsg));
+	if(!coms) {
+		return NULL;
+	}
+
+	// setup the message queue
+.B 	coms->mqueue = MsgQueueCreat();
+	if(!coms->mqueue) {
+		// abort
+		free(coms);
+		return NULL;
+	}
+
+	// continue setting up communications
+	pthread_cond_init(&coms->ready, NULL);
+	pthread_mutex_init(&coms->mlock, NULL);
+	return coms;
+}

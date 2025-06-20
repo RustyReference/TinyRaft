@@ -1,5 +1,8 @@
 #include "server.h"
 
+#ifndef MAXID 
+#define MAXID 16
+#endif
 
 // A pool of unique ids.
 struct {
@@ -105,11 +108,13 @@ int MsgQueuePush(struct MsgQueue* mqueue, char* msg, int len) {
 
 // get first available id.
 int getId() {
+
 	int res = -1;
 	pthread_mutex_lock(&idpool.lock);
 	// get first index with zero-value
 	for(int i = 0; i < MAXID; i++) {
 		if(!idpool.ids[i]) {
+			idpool.ids[i] = 1;
 			res = i;
 			break;
 		}

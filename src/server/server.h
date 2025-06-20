@@ -2,7 +2,6 @@
 
 #define SERVER_H
 #define _Nullable
-#define MAXID 16
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +48,8 @@ struct ServInfo {
 struct ThreadMsg {
 	struct MsgQueue* mqueue; 				// message buffers.
 	pthread_cond_t ready; 					// new message ready.
-	pthread_mutex_t mlock; 	 				// ThreadMsg is being used rn.
+	// action of locking itself counts as a write! Don't forget.
+	pthread_mutex_t mlock; 	 				// Don't modify without a lock!
 };
 struct ThreadMsg* ThreadMsgCreat();
 
@@ -71,7 +71,7 @@ void ServThreadFree(struct ServThread** server); // free a ServThread* server.
 struct QueueEntry* QueueEntryCreat(char* _Nullable msg, int len);
 
 // Free the QueueEntry msg. Won't crash on NULL.
-void QueueEntryFree(struct QueueEntry** msg);
+void QueueEntryFree(struct QueueEntry** _Nullable msg);
 
 // Get an MsgQueue. NULL on malloc error.
 // 	Don't forget to MsgQueueFree later.

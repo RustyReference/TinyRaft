@@ -1,0 +1,44 @@
+.TH getId server 2025-06-20 "server manpages"
+
+.SH NAME
+getId
+\-
+Get a unique id.
+
+.SH FILES
+.RI ( server.h ", " server.c)
+
+.SH SYNOPSIS
+.nf
+.B #include "server.h"
+.P
+.BI "int getId();"
+.BI "void clearId(int " id ");"
+.fi
+
+.SH DESCRIPTION
+getId returns the lowest unique integer every single time. clearId makes that number available again.
+returns -1 on error.
+
+.SH MACROS
+MAXID value is 16 by default. Set it higher for more unique ids.
+
+.SH NOTES
+initServer needed. Check manpage at initServer.man
+
+.EX 
+#include "server.h"
+#define MAXID 9
+
+int main() {
+.B 	initServer();
+
+	for(int i = 0; i < 10; i++) {
+.B  		printf("%d\n", getId());
+	}
+.B		clearId(9);
+.B  	printf("%d\n", getId());
+	
+	termServer();
+	return 0;
+}

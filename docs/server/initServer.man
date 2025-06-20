@@ -1,4 +1,4 @@
-.TH initServer 3 2025-06-19 "server manpages"
+.TH initServer server 2025-06-19 "server manpages"
 
 .SH NAME
 initServer
