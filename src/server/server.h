@@ -3,6 +3,23 @@
 
 #include "thread/thread.h"
 
+// Hold information about a server.
+struct ServInfo {
+	int sockfd;
+	struct sockaddr_in6 addr;
+	socklen_t addrlen;
+};
+
+// Use to manage servers as threads.
+struct ServThread {
+	struct ServInfo info; 	// socket and address
+	struct ThreadMsg* coms; // commands
+	pthread_t* tid; 				// thread ids
+	int tlen; 							// thread amount.
+	int id; 								// unique id of the server. 
+};
+void ServThreadFree(struct ServThread** server); // free a ServThread* server. 
+
 // init all startup stuff and global variables . 
 void initServer(void);
 

@@ -136,13 +136,6 @@ void* leaderCommandThread(void* leaderServer) {
 	pthread_exit(NULL);
 }
 
-void* leaderAcceptThread([[maybe_unused]]void* leaderServer) {
-	int *oldtype = NULL;
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
-	while(1);
-	pthread_exit(NULL);
-}
-
 // start processing a leader server
 // @info : get socket from @info.
 // @RETURN : ThreadMsg. NULL on error. 
@@ -213,5 +206,73 @@ struct ServThread* procLeader(struct ServInfo info) {
 
 	return server;
 }
+
+// free ServThread the pointer @server from memory
+void ServThreadFree(struct ServThread** server) {
+	struct ServThread* contents = *server;
+	struct ThreadMsg* coms = contents->coms;
+	int sockfd = contents->info.sockfd;
+	// free stored pointers
+	close(sockfd);
+	clearId(contents->id);
+	MsgQueueFree(&coms->mqueue);
+	free(coms);
+	// free struct
+	for(int i = 0; i < contents->tlen; i++) {
+		pthread_cancel(contents->tid[i]);
+		pthread_join(contents->tid[i], NULL);
+	}
+	free(contents->tid);
+	free(contents);
+	*server = NULL;
+}
+
+// Start some threads for a server. 
+// @server : Threads will be put on this ServThread
+// @threadFunc : This function will be called with server as the only arg.
+// #RETURN : 0 on error and 1 on success.
+int servThreadAdd(struct ServThread* server, void* (threadFunctions)(void*), ...) {
+	va_list ap;
+	va_start(ap, threadFunctions);
+	int i, err = -1;
+	// make each function
+	for(i = 0; *threadFunctions; i++) {
+		void* nextFunction = va_arg(ap, void*);
+		if(pthread_create(&server->tid[i], NULL, nextFunction, NULL)) {
+			// abort
+			err = i; // This is a headache...
+			break;
+		}
+	}
+	// don't really have to read this
+	if(err >= 0) {
+		// undo everything and exit
+		for(int i = 0; i <= err; i--) {	
+			pthread_cancel(server->tid[i]);
+			pthread_join(server->tid[i], NULL);
+		}
+		return 0;
+	}
+	// success
+	va_end(ap);
+	return 1;
+}
+
+
+void* leaderAcceptThread(void* leaderServer) {
+	// init
+	int *oldtype = NULL;
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
+	struct ServThread* server = (struct ServThread*)leaderServer;
+	int sockfd = server->info.sockfd;
+	
+	// while getting new communications.
+	char buf[1024];
+	while(recv(sockfd, ))
+	
+	pthread_exit(NULL);
+}
+
+
 
 #endif

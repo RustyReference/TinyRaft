@@ -96,26 +96,6 @@ int MsgQueuePush(struct MsgQueue* mqueue, char* msg, int len) {
 	return 1;
 }
 
-// free ServThread the pointer @server from memory
-void ServThreadFree(struct ServThread** server) {
-	struct ServThread* contents = *server;
-	struct ThreadMsg* coms = contents->coms;
-	int sockfd = contents->info.sockfd;
-	// free stored pointers
-	close(sockfd);
-	clearId(contents->id);
-	MsgQueueFree(&coms->mqueue);
-	free(coms);
-	// free struct
-	for(int i = 0; i < contents->tlen; i++) {
-		pthread_cancel(contents->tid[i]);
-		pthread_join(contents->tid[i], NULL);
-	}
-	free(contents->tid);
-	free(contents);
-	*server = NULL;
-}
-
 // Send message to a server thread.
 // @coms : Appends message to commands in @coms.
 // @msg : What to append.
@@ -231,33 +211,3 @@ void ThreadMsgFree(struct ThreadMsg** threadMsg) {
 	*threadMsg = NULL;
 }
 
-// Start some threads for a server. 
-// @server : Threads will be put on this ServThread
-// @threadFunc : This function will be called with server as the only arg.
-// #RETURN : 0 on error and 1 on success.
-int servThreadAdd(struct ServThread* server, void* (threadFunctions)(void*), ...) {
-	va_list ap;
-	va_start(ap, threadFunctions);
-	int i, err = -1;
-	// make each function
-	for(i = 0; *threadFunctions; i++) {
-		void* nextFunction = va_arg(ap, void*);
-		if(pthread_create(&server->tid[i], NULL, nextFunction, NULL)) {
-			// abort
-			err = i; // This is a headache...
-			break;
-		}
-	}
-	// don't really have to read this
-	if(err >= 0) {
-		// undo everything and exit
-		for(int i = 0; i <= err; i--) {	
-			pthread_cancel(server->tid[i]);
-			pthread_join(server->tid[i], NULL);
-		}
-		return 0;
-	}
-	// success
-	va_end(ap);
-	return 1;
-}

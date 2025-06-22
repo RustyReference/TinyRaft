@@ -31,13 +31,6 @@ struct QueueEntry {
 };
 STAILQ_HEAD(MsgQueue, QueueEntry);
 
-// Hold information about a server.
-struct ServInfo {
-	int sockfd;
-	struct sockaddr_in6 addr;
-	socklen_t addrlen;
-};
-
 // To send messages accross threads.
 struct ThreadMsg {
 	struct MsgQueue* mqueue; 				// message buffers.
@@ -46,16 +39,6 @@ struct ThreadMsg {
 	pthread_mutex_t mlock; 	 				// Don't modify without a lock!
 };
 struct ThreadMsg* ThreadMsgCreat();
-
-// Use to manage servers as threads.
-struct ServThread {
-	struct ServInfo info; 	// socket and address
-	struct ThreadMsg* coms; // commands
-	pthread_t* tid; 				// thread ids
-	int tlen; 							// thread amount.
-	int id; 								// unique id of the server. 
-};
-void ServThreadFree(struct ServThread** server); // free a ServThread* server. 
 
 // Get a QueueEntry. NULL on error.
 // @msg : The initial string buffer.
@@ -97,7 +80,6 @@ int threadMsgRecv(struct ThreadMsg* coms, char** buf);
 
 // Free a ThreadMsg. No threads must be reading it.
 void ThreadMsgFree(struct ThreadMsg** threadMsg);
-
 
 #undef _Nullable
 #endif
