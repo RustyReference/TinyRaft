@@ -7,7 +7,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <getopt.h>
-#include "node.h"
+#include "config.h"
+#include "peers.h"
 
 /**
  * States a server node
@@ -51,7 +52,7 @@ int populate_peers(Config *given, char *option) {
 	char *dup, *token;
 
 	if ((dup = strdup(option)) == NULL) {
-		fprintf(stderr, "populate_peers: Failed to duplicate string: %s",
+		fprintf(stderr, "populate_peers(): Failed to duplicate string: %s",
 			strerror(errno));
 		
 		return 1;
@@ -63,7 +64,7 @@ int populate_peers(Config *given, char *option) {
 		given->peers = realloc(given->peers, sizeof(char *) * (npeers + 1));
 		char *given_token = given->peers[npeers] = strdup(token);
 		if (given_token == NULL) {
-			fprintf(stderr, "populate_peers: Failed to duplicate token: %s",
+			fprintf(stderr, "populate_peers(): Failed to duplicate token: %s",
 				strerror(errno));
 		}
 		
@@ -79,6 +80,7 @@ int populate_peers(Config *given, char *option) {
  * Takes in the command line options to configure the server node
  * @param argc the number of arguments
  * @param argv the command line arguments, which contain the options
+ * @return an object containing the node's id, port, and peers
  */
 Config parse_args(int argc, char **argv) {
 	Config config = {0};
@@ -111,7 +113,7 @@ Config parse_args(int argc, char **argv) {
 				exit(EXIT_FAILURE);
 		}
 	}
-	return (Config){0}; // error message
+	return (Config){0}; // error return value
 }
 
 /**
@@ -125,12 +127,28 @@ void free_config_static(Config *given) {
     free(given->peers);         // Free the array itself
 }
 
+void test() {
+	char buff[20];
+	int port;
+	char *addr = "127.0.0.1:3000";
+	sscanf(addr, "%[^:]:%d", buff, &port);
+	printf("The match is: %s and the port is: %d\n", buff, port);
+}
+
 /**
- * The main node program that starts the node
+ * The main node program
  */
 int main(int argc, char *argv[]) {
 	Config config = parse_args(argc, argv);
-	free_config_static(&config);
+	Peer_arr *peers = get_peers(&config);
+	
+	free_config_static(&config);	// Must free at the end
+	// Must free 'peers'
+
+
+	/*
+	test();
+	*/
 
 	return 0;
 }
