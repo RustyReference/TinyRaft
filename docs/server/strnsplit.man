@@ -1,0 +1,54 @@
+.TH strnsplit server 2025-06-20 "server manpages"
+
+.SH NAME
+strnsplit
+\-
+Split a string into an array.
+
+.SH FILES
+.RI ( server.h ", " server.c)
+
+.SH SYNOPSIS
+.nf
+.B #include "server.h"
+.P
+.BI "int strnsplit(char* " str ", int " len ", char " delim ", char* " buf "[]); "
+.fi
+
+.SH DESCRIPTION
+Splits the string "str" of max "len" characters on "delim" and puts them into "buf"
+returns lenght of the buf on success and -1 on error.
+
+.SH NOTES
+You only need to free(*buf) to free it.
+
+.SH EXAMPLE
+.EX
+#include <stdio.h>
+#include <string.h>
+#include "server.h"
+#include <wait.h>
+
+int main() {
+	initServer();
+	char* msg = "hello there how is it going";
+	char* buf[255];
+
+	// split messsage
+	int len = strnsplit(msg, 1024, ' ', buf);
+	if(len < 0) {
+		termServer();
+		exit(EXIT_FAILURE);
+	}
+
+	// print each element individually
+	for(int i = 0; i < len; i++) {
+		printf("%s\\n", buf[i]);
+	}
+
+	// free and exit
+	free(*buf);
+	termServer();
+	return 0;
+}
+

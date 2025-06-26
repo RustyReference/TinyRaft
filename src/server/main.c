@@ -3,43 +3,34 @@
 #include "server.h"
 #include <wait.h>
 
-void* printMessages(void* coms) {
-	// Free everything when thread exits.
-	int oldtype;
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &oldtype); 
-
-	// print each message. end thread if "exit"
-	char* buf = NULL;
-	int len = 0;
-	while( (len = threadMsgRecv(coms, &buf)) > 0) {
-		//sleep(2);
-		if(strncmp(buf, "exit", len) == 0) {
-			break;
-		}
-		printf("Thread %lu recieved : %s at %ld\n", pthread_self(), buf, time(NULL));
-		free(buf);
-		buf = NULL;
-	}
-	free(buf);
-	pthread_exit(NULL);
-}
-
 int main() {
-	struct ThreadMsg* coms = ThreadMsgCreat();
-	pthread_t tid;
-	pthread_create(&tid, NULL, printMessages, coms);
+	initServer();
 
-	// get bunch of inputs
+	// get a server
+	struct ServInfo leaderServer;
+	if(!getLeader(&leaderServer, 9600)) {
+		termServer();
+		return 0;
+	}
+
+	// start it
+	struct ServThread* leaderThread = procLeader(leaderServer);
+	if(!leaderThread) {
+		termServer();
+		return 0;
+	}
+
 	char buf[255];
 	while(fgets(buf, 255, stdin)) {
-	 	threadMsgSend(coms, buf, 0); // 0 makes it use strnlen automatically.
+		*strchrnul(buf, '\n') = '\0';
+		threadMsgSend(leaderThread->coms, buf, 0);
 		if(strncmp(buf, "exit", 255) == 0) {
 			break;
 		}
-		printf("Thread %lu sending : %s at %ld\n", pthread_self(), buf, time(NULL));
 	}
 
-	pthread_cancel(tid);
-	pthread_join(tid, NULL);
+	// free the server and exit
+	ServThreadFree(&leaderThread);
+	termServer();
 	return 0;
 }

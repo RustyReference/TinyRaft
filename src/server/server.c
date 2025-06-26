@@ -2,10 +2,15 @@
 #define LEADER_H
 
 #include "server.h"
+#include <sys/time.h>
+#include <arpa/inet.h>
 
 #ifndef MAXID 
 #define MAXID 16
 #endif
+
+struct ServList clientList;
+struct ServList backupList;
 
 // A pool of unique ids.
 struct {
@@ -15,6 +20,8 @@ struct {
 
 // init all startup stuff and global variables. 
 void initServer(void) {
+	SLIST_INIT(&clientList);
+	SLIST_INIT(&backupList);
 	memset(idpool.ids, 0, sizeof idpool.ids);
 	pthread_mutex_init(&idpool.lock, NULL);
 }
@@ -195,7 +202,7 @@ struct ServThread* procLeader(struct ServInfo info) {
 	}
 
 	// DRY stands for "do repeat yourself"
-	if(pthread_create(&server->tid[1], NULL, leaderAcceptThread, NULL)) {
+	if(pthread_create(&server->tid[1], NULL, leaderAcceptThread, server)) {
 		// abort
 		clearId(id);
 		ThreadMsgFree(&coms);
@@ -212,11 +219,13 @@ void ServThreadFree(struct ServThread** server) {
 	struct ServThread* contents = *server;
 	struct ThreadMsg* coms = contents->coms;
 	int sockfd = contents->info.sockfd;
+	
 	// free stored pointers
 	close(sockfd);
 	clearId(contents->id);
 	MsgQueueFree(&coms->mqueue);
 	free(coms);
+	
 	// free struct
 	for(int i = 0; i < contents->tlen; i++) {
 		pthread_cancel(contents->tid[i]);
@@ -258,21 +267,194 @@ int servThreadAdd(struct ServThread* server, void* (threadFunctions)(void*), ...
 	return 1;
 }
 
-
+// Accept a new server and start its own thread
+// @leaderServer : ServThread of the leaderServer.
+// #RETURN : NULL on exit.
 void* leaderAcceptThread(void* leaderServer) {
 	// init
 	int *oldtype = NULL;
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
 	struct ServThread* server = (struct ServThread*)leaderServer;
-	int sockfd = server->info.sockfd;
 	
-	// while getting new communications.
-	char buf[1024];
-	while(recv(sockfd, ))
+	// init bufs
+	socklen_t addrlen;
+	struct sockaddr_in6 addr;
+	int sockfd;
+	
+	// For each new connection.
+	while((sockfd = accept(server->info.sockfd, (struct sockaddr*)&addr, &addrlen))) {
+		// Gather the information
+		struct ServInfo info = {
+			.sockfd = sockfd,
+			.addr = addr,
+			.addrlen = addrlen
+		};
+		// Start a new thread with it.
+		struct ServThread* servThread = malloc(sizeof(struct ServThread));
+		servThread->info = info;
+		servThread->tid = calloc(2, sizeof(pthread_t));
+		servThread->tlen = 2;
+		pthread_create(&servThread->tid[0], NULL, leaderAddServer, servThread);
+	}
 	
 	pthread_exit(NULL);
 }
 
+const struct timeval newServTimeout = {
+	.tv_sec = 5,
+	.tv_usec = 0
+};
 
+// Add a server to backupList or clientList and compute it.
+// @servInfo : struct ServThread that had info, tid, and tlen initialized beforehand.
+// #RETURN : NULL on exit.
+void* leaderAddServer(void* servThread) {
+	int *oldtype = NULL;
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
+	
+	// set a heartbeat.
+	struct ServThread* thread = (struct ServThread*)servThread;
+	int sockfd = thread->info.sockfd;
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &newServTimeout, sizeof(newServTimeout));
+
+	// first connection must be made within 5 seconds.
+	char buf[1024];
+	if(recv(sockfd, buf, 1024, 0) < 0) {
+		pthread_exit(NULL);
+	}
+
+	// init
+	thread->coms = ThreadMsgCreat();
+	thread->id = getId();
+	if(strncmp(buf, "client", 1024) == 0) {
+		// start processing as a client server
+		pthread_create(&thread->tid[1], NULL, clientRecvThread, thread);
+		clientCommandProc(thread);
+		pthread_exit(NULL);
+	} else if(strncmp(buf, "backup", 1024) == 0) {
+		// start processing as a backup server
+		pthread_create(&thread->tid[1], NULL, clientRecvThread, thread);
+		backupCommandProc(thread);
+	} else {
+		// invalid
+		thread->tlen--;
+	}
+
+	// free and exit
+	ServThreadFree(&thread);
+	pthread_exit(NULL);
+}
+
+// split a string into multiple strings
+// @str : string you wish to split.
+// @len : max lenght of the str
+// @delim : delimiter to use when splitting.
+// @buf : Will store the strings in this array.
+// #RETURN : lenght of array
+// 	-1 on error
+// #NOTES :
+// 	free *buf once without looping over once done, ex.
+// 	char* buf[255];
+// 	int len = strnsplit("hello there how is it going", 1024, ' ', buf);
+// 	if(len > 0) {
+// 		...
+// 		free(*buf);
+// 	}
+int strnsplit(char* str, int len, char delim, char* buf[]) {
+	if(!str) {
+		return -1;
+	}
+
+	// skip start
+	char* cpy = strndup(str, len);
+	while(cpy[0] == delim) {
+		cpy++;
+	}
+	buf[0] = cpy;
+
+	// go around seperating stuff.
+	int i;
+	for(i = 1; *(cpy = strchrnul(cpy, delim)); i++ ) {
+		// skip through delims
+		while(*cpy == delim) {
+			*cpy = '\0';
+			cpy++;
+		}
+		// set element
+		buf[i] = cpy;
+	}
+	buf[i+1] = NULL;
+	
+	return i;
+}
+
+void* clientRecvThread([[maybe_unused]]void* clientServer) {
+	pthread_exit(NULL);
+}
+void clientCommandProc([[maybe_unused]]struct ServThread* clientServer) {
+	return;
+}
+void* backupRecvThread([[maybe_unused]]void* backupServer) {
+	pthread_exit(NULL);
+}
+void backupCommandProc([[maybe_unused]]struct ServThread* backupServer) {
+	errno = 0;
+	// sanitize
+	if(!backupServer) {
+		return;
+	}
+
+	// add to the list
+	struct ServListEntry* entry = malloc(sizeof(struct ServListEntry));
+	if(!entry) {
+		errno = ENOMEM;
+		free(backupServer);
+		return;
+	}
+	entry->server = backupServer;
+	SLIST_INSERT_HEAD(&backupList, entry, servers);
+
+	// init
+	struct ServInfo info = backupServer->info;
+	const char* straddr = inet_ntop(AF_INET6, &info.addr.sin6_addr, NULL, sizeof(info.addr));
+	struct ThreadMsg* coms = backupServer->coms;
+	char* command[255] = { 0 };
+	[[maybe_unused]]int commandLen = 0;
+
+	// while getting messages
+	char* buf = NULL;
+	int len = 0;
+	while((len = threadMsgRecv(coms, &buf)) >= 0) {
+		// convert it to a command
+		commandLen = strnsplit(buf, len, ' ', command);
+		if(commandLen < 0) {
+			// error
+			continue;
+		}
+		if(strncmp("exit", buf, len) == 0) {
+			// exit
+			free(buf);
+			buf = NULL;
+			free(*command);
+			*command = NULL;
+			break;
+		} else if(strncmp("greet", buf, len) == 0) {
+			// greet : say "hello, world"
+			printf("%s from %s\n", "hello, world", straddr);
+		} else if(strncmp("say", buf, len) == 0) {
+			// say : print something specific
+			printf("%s from %s\n", buf+4, straddr);
+		} else if(strncmp("send", buf, len) == 0) {
+			// send : send this to the connected server
+			send(info.sockfd, buf+5, len-5, 0);
+		} 
+		free(buf);
+		buf = NULL;
+		free(*command);
+		*command = NULL;
+	}
+	pthread_exit(NULL);
+	return;
+}
 
 #endif
