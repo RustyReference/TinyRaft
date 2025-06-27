@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include "config.h"
 #include "peers.h"
+#include "utils.h"
 
 /**
  * States a server node
@@ -43,32 +44,37 @@ int start_node(char *address, int port) {
 /**
  * Takes the command line option and puts them in the 'peers' attribute
  * of the given Config object
- * @param given the given Config object
+ * 
+ * Preconditions:
+ * 		- 'config' must point to a zero-initialized Config struct
+ * 			because num_peers is to start at 0.
+ * 			
+ * @param config the given Config object
  * @param option the command line option to parse
  * @return 0 if success; 1 otherwise
  */
-int populate_peers(Config *given, char *option) {
+int populate_peers(Config *config, char *option) {
 	errno = 0;
 	char *dup, *token;
+	dup = strdup_checked(option);
 
-	if ((dup = strdup(option)) == NULL) {
-		fprintf(stderr, "populate_peers(): Failed to duplicate string: %s",
-			strerror(errno));
-		
-		return 1;
-	}
-
-	token = strtok(option, ",");
+	// Parse peers from arg 'option' to 'config->peers'
+	token = strtok(dup, ",");
 	while (token != NULL) {
-		int npeers = given->num_peers;
-		given->peers = realloc(given->peers, sizeof(char *) * (npeers + 1));
-		char *given_token = given->peers[npeers] = strdup(token);
-		if (given_token == NULL) {
-			fprintf(stderr, "populate_peers(): Failed to duplicate token: %s",
+		int npeers = config->num_peers;
+		char ip_port[ADDR_LEN] = strndup_checked(token, ADDR_LEN);
+
+		config->peers = (char **) realloc(
+			config->peers, sizeof(char *) * (npeers + 1));
+
+		if (ip_port == NULL) {
+			fprintf(stderr, 
+				"populate_peers(): Failed to duplicate token: %s",
 				strerror(errno));
 		}
-		
-		given->num_peers++;
+		 
+		config->peers[npeers] = strndup_checked(token, ADDR_LEN);
+		config->num_peers++;
 		token = strtok(NULL, ",");
 	}
 	
@@ -78,57 +84,62 @@ int populate_peers(Config *given, char *option) {
 
 /**
  * Takes in the command line options to configure the server node
+ * @param config the config object to mutate with the new information
  * @param argc the number of arguments
  * @param argv the command line arguments, which contain the options
- * @return an object containing the node's id, port, and peers
  */
-Config parse_args(int argc, char **argv) {
+void parse_args(Config *config, int argc, char **argv) {
 	Config config = {0};
 	static struct option long_opts[] = {
-		{"id", 		required_argument, 0, 'i'},
-		{"port", 	required_argument, 0, 'p'},
-		{"peers", 	required_argument, 0, 'x'}
+		{"id", 		required_argument,	0, 	'i'},
+		{"port", 	required_argument, 	0, 	'p'},
+		{"peers", 	required_argument, 	0, 	'x'},
+		{0, 0, 0, 0}
 	};
 
 	int code, opt_ind;
-	while ((code = getopt_long(argc, argv, "i:p:x:", long_opts, &opt_ind))) {
+	while (code = getopt_long(argc, argv, "i:p:x:", long_opts, &opt_ind)) {
 		switch (code) {
 			case 'i':
-				config.id = atoi(optarg);
+				config->id = atoi(optarg);
 				break;
 			case 'p':
-				config.port = atoi(optarg);
+				config->port = atoi(optarg);
 				break;
 			case 'x':
 				populate_peers(&config, optarg);
 				break;
 			case -1: // end of args
-				if (config.id == 0 || config.port == 0 || config.num_peers == 0) {
+				if (config->id == 0 
+					|| config->port == 0 
+					|| config->num_peers == 0
+				) {
 					fprintf(stderr, "Missing required arguments.\n");
 					exit(EXIT_FAILURE);
 				}
-				return config;
+				return;
 			default:
-				fprintf(stderr, "Usage: %s --id=<id> --port=<port> --peers=<peers>\n", argv[0]);
+				fprintf(stderr, 
+					"Usage: %s --id=<id> --port=<port> --peers=<peers>\n", 
+					argv[0]);
 				exit(EXIT_FAILURE);
 		}
 	}
-	return (Config){0}; // error return value
 }
 
 /**
  * Deallocates the 'peers' field of the Config object
  */
-void free_config_static(Config *given) {
-    for (int i = 0; i < given->num_peers; i++) {
-        free(given->peers[i]);  // Free each member in the array
+void free_config_static(Config *config) {
+    for (int i = 0; i < config->num_peers; i++) {
+        free(config->peers[i]);  // Free each member in the array
     }
     
-    free(given->peers);         // Free the array itself
+    free(config->peers);         // Free the array itself
 }
 
 void test() {
-	char buff[20];
+	char buff[21];
 	int port;
 	char *addr = "127.0.0.1:3000";
 	sscanf(addr, "%[^:]:%d", buff, &port);
@@ -139,12 +150,12 @@ void test() {
  * The main node program
  */
 int main(int argc, char *argv[]) {
-	Config config = parse_args(argc, argv);
-	Peer_arr *peers = get_peers(&config);
+	Config config = {0};
+	Peer_arr *peers;
+	parse_args(&config, argc, argv);	// Must free at the end
+	peers = get_peers(&config);			// Must free at the end
+	free_config_static(&config);
 	
-	free_config_static(&config);	// Must free at the end
-	// Must free 'peers'
-
 
 	/*
 	test();

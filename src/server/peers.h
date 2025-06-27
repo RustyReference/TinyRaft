@@ -1,13 +1,13 @@
 #ifndef PEERS_H
 #define PEERS_H
-#define ADDR_LEN 15
-#include <config.h>
+#define IP_LEN 16
+#include "config.h"
 
 /**
  * Contains information about each peer the node has
  */
 typedef struct {
-    char ip[ADDR_LEN];
+    char ip[IP_LEN];
     int port;
     int socket_fd;
 } Peer;
@@ -27,6 +27,16 @@ typedef struct {
  *  --Returns dynamic memory that must be freed.
  */
 Peer *create_peer();
+
+/**
+ * Parse string with IP Address and Port and 
+ * read them into fields of a Peer, namely 'ip' and 'port'
+ * @param ip_port the provided string in the form IP:PORT
+ * @param ip the char pointer to the IP address 
+ * @param port the pointer to the port
+ * @return 0 on success, 1 otherwise
+ */
+int scan_peer_fields(char *ip_port, char *ip, int *port);
 
 /**
  * Gets the peers stored in the Config object and 
