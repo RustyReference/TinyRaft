@@ -9,19 +9,25 @@
 #define MAXID 16
 #endif
 
-struct ServList clientList;
-struct ServList backupList;
-
 // A pool of unique ids.
 struct {
 	int ids[MAXID];
 	pthread_mutex_t lock;
 } idpool;
 
+// list of servers
+struct ServListSafe clientList, backupList;
+struct ServThread* leader = NULL;
+
 // init all startup stuff and global variables. 
 void initServer(void) {
-	SLIST_INIT(&clientList);
-	SLIST_INIT(&backupList);
+	// server list
+	SLIST_INIT(&clientList.servers);
+	pthread_mutex_init(&clientList.lock, NULL);
+	SLIST_INIT(&backupList.servers);
+	pthread_mutex_init(&backupList.lock, NULL);
+
+	// id pool
 	memset(idpool.ids, 0, sizeof idpool.ids);
 	pthread_mutex_init(&idpool.lock, NULL);
 }
@@ -126,17 +132,7 @@ void* leaderCommandThread(void* leaderServer) {
 	char* buf = NULL;
 	int len = 0;
 	while((len = threadMsgRecv(coms, &buf)) >= 0) {
-		if(strncmp("exit", buf, len) == 0) {
-			// exit
-			free(buf);
-			buf = NULL;
-			break;
-		} else if(strncmp("greet", buf, len) == 0) {
-			// greet : say "hello, world""
-			printf("hello, world\n");
-		} else if(strncmp("say", buf, len) == 0) {
-
-		}
+		leaderCommandExec(buf, len);
 		free(buf);
 		buf = NULL;
 	}
@@ -211,7 +207,8 @@ struct ServThread* procLeader(struct ServInfo info) {
 		return NULL;
 	}
 
-	return server;
+	leader = server;
+	return leader;
 }
 
 // free ServThread the pointer @server from memory
@@ -315,7 +312,7 @@ void* leaderAddServer(void* servThread) {
 	// set a heartbeat.
 	struct ServThread* thread = (struct ServThread*)servThread;
 	int sockfd = thread->info.sockfd;
-	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &newServTimeout, sizeof(newServTimeout));
+	//setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &newServTimeout, sizeof(newServTimeout));
 
 	// first connection must be made within 5 seconds.
 	char buf[1024];
@@ -333,7 +330,7 @@ void* leaderAddServer(void* servThread) {
 		pthread_exit(NULL);
 	} else if(strncmp(buf, "backup", 1024) == 0) {
 		// start processing as a backup server
-		pthread_create(&thread->tid[1], NULL, clientRecvThread, thread);
+		pthread_create(&thread->tid[1], NULL, backupRecvThread, thread);
 		backupCommandProc(thread);
 	} else {
 		// invalid
@@ -388,16 +385,7 @@ int strnsplit(char* str, int len, char delim, char* buf[]) {
 	return i;
 }
 
-void* clientRecvThread([[maybe_unused]]void* clientServer) {
-	pthread_exit(NULL);
-}
-void clientCommandProc([[maybe_unused]]struct ServThread* clientServer) {
-	return;
-}
-void* backupRecvThread([[maybe_unused]]void* backupServer) {
-	pthread_exit(NULL);
-}
-void backupCommandProc([[maybe_unused]]struct ServThread* backupServer) {
+void backupCommandProc(struct ServThread* backupServer) {
 	errno = 0;
 	// sanitize
 	if(!backupServer) {
@@ -412,49 +400,222 @@ void backupCommandProc([[maybe_unused]]struct ServThread* backupServer) {
 		return;
 	}
 	entry->server = backupServer;
-	SLIST_INSERT_HEAD(&backupList, entry, servers);
+	pthread_mutex_lock(&backupList.lock);
+	SLIST_INSERT_HEAD(&backupList.servers, entry, servers);
+	pthread_mutex_unlock(&backupList.lock);
 
 	// init
-	struct ServInfo info = backupServer->info;
-	const char* straddr = inet_ntop(AF_INET6, &info.addr.sin6_addr, NULL, sizeof(info.addr));
 	struct ThreadMsg* coms = backupServer->coms;
-	char* command[255] = { 0 };
-	[[maybe_unused]]int commandLen = 0;
 
 	// while getting messages
 	char* buf = NULL;
 	int len = 0;
 	while((len = threadMsgRecv(coms, &buf)) >= 0) {
-		// convert it to a command
-		commandLen = strnsplit(buf, len, ' ', command);
-		if(commandLen < 0) {
-			// error
-			continue;
-		}
-		if(strncmp("exit", buf, len) == 0) {
-			// exit
-			free(buf);
-			buf = NULL;
-			free(*command);
-			*command = NULL;
-			break;
-		} else if(strncmp("greet", buf, len) == 0) {
-			// greet : say "hello, world"
-			printf("%s from %s\n", "hello, world", straddr);
-		} else if(strncmp("say", buf, len) == 0) {
-			// say : print something specific
-			printf("%s from %s\n", buf+4, straddr);
-		} else if(strncmp("send", buf, len) == 0) {
-			// send : send this to the connected server
-			send(info.sockfd, buf+5, len-5, 0);
-		} 
+		// execute the command.
+		backupCommandExec(backupServer, buf, len);
 		free(buf);
 		buf = NULL;
-		free(*command);
-		*command = NULL;
 	}
 	pthread_exit(NULL);
 	return;
 }
+
+void* backupRecvThread(void* backupServer) {
+	struct ServThread* server = (struct ServThread*)backupServer;
+	int sockfd = server->info.sockfd;
+	
+	// while getting messages.
+	char buf[1024] = { 0 };
+	while(recv(sockfd, buf, 1024, 0) >= 0) {
+		// print them.
+		if(!buf[0]) {
+			continue;
+		}
+		printf("%s\n", buf);
+		buf[0] = '\0';
+	}
+	printf("%s\n", "done");
+	pthread_exit(NULL);
+}
+
+
+// execute a command for the leader
+// @cmd : Command
+// @cmdlen : maxsize of the command
+// #RETURN : negative on error, otherwise ID of the command.
+// 	-1 : invalid/error
+// 	0 : exit command
+// 	1 : backup-all
+// 	2 : 
+int leaderCommandExec(char* cmd, int cmdlen) {
+	// sanitize
+	if(!cmd || cmdlen <= 0) {
+		return -1;
+	} 
+	
+	// pretty well optimized so might as well
+	char* buf[255];
+	int arglen = strnsplit(cmd, cmdlen, ' ', buf);
+	if(arglen < 0) {
+		free(*buf);
+		return -1;
+	}
+	int firstlen = strnlen(buf[0], cmdlen)+1;
+
+	// redirections
+	cmd += firstlen;
+
+	// exit
+	if(strncmp(buf[0], "exit", firstlen) == 0) {
+		free(*buf);
+		return 0;
+	}
+
+	// backup-all
+	if(strncmp(buf[0], "backup-all", firstlen) == 0) {
+		broadcastMsg(backupList, cmd, 0);
+		leaderCommandExec(cmd, strnlen(cmd, cmdlen)+1); // recursion at its finest!
+		free(*buf);
+		return 1;
+	}
+
+	// client-all
+	if(strncmp(buf[0], "backup-all", firstlen) == 0) {
+		broadcastMsg(clientList, cmd, 0);
+		free(*buf);
+		return 1;
+	}
+
+	// end of redirections.
+	cmd -= cmdlen;
+	printf("%s\n", cmd);
+
+	return -1;
+}
+
+// broadcast a message to a list of servers
+// @server : list of servers
+// @msg : what to say
+// @maxlen : size of the message, set <= 0 for strnlen
+void broadcastMsg(struct ServListSafe serverlist, char* msg, int maxlen) {
+	// sanitize 
+	if(!msg) {
+		return;
+	}
+	if(maxlen < 0) {
+		maxlen = 0;
+	}
+
+	// loop through while sending
+	pthread_mutex_lock(&serverlist.lock);
+	struct ServListEntry* current;
+	// whoever made SLIST has my respect for this syntax
+	SLIST_FOREACH(current, &serverlist.servers, servers) {
+		threadMsgSend(current->server->coms, msg, 0);
+	}
+	// end
+	pthread_mutex_unlock(&backupList.lock);
+}
+
+int backupCommandExec(struct ServThread* server, char* cmd, int cmdlen){
+	if(!server || !cmd) {
+		return -1;
+	}
+
+	// commands are made to be readable.
+	// jk they are nonsense
+	char* buf[255];
+	int bufsize = strnsplit(cmd, cmdlen, ' ', buf);
+	if(bufsize < 0) {
+		return -1;
+	}
+
+	// exit
+	if(strncmp(buf[0], "exit", cmdlen) == 0) {
+		free(*buf);
+		return 0;
+	}
+
+	// send
+	send(server->info.sockfd, cmd, cmdlen, 0);
+	return 1;
+}
+
+void* clientRecvThread(void* clientServer) {
+	if(!clientServer) {
+		pthread_exit(NULL);
+	}
+	// init
+	struct ServThread* server = (struct ServThread*)clientServer;
+	int sockfd = server->info.sockfd;
+
+	// while getting string
+	char buf[1024];
+	while(recv(sockfd, buf, 1024, 0) > 0) {
+		// send it to leader
+		threadMsgSend(leader->coms, buf, 0);
+	}
+	pthread_exit(NULL);
+}
+
+void clientCommandProc(struct ServThread* clientServer) {
+	errno = 0;
+	// sanitize
+	if(!clientServer) {
+		return;
+	}
+
+	// add to the list
+	struct ServListEntry* entry = malloc(sizeof(struct ServListEntry));
+	if(!entry) {
+		errno = ENOMEM;
+		free(clientServer);
+		return;
+	}
+	entry->server = clientServer;
+	pthread_mutex_lock(&clientList.lock);
+	SLIST_INSERT_HEAD(&clientList.servers, entry, servers);
+	pthread_mutex_unlock(&clientList.lock);
+
+	// init
+	struct ThreadMsg* coms = clientServer->coms;
+
+	// while getting messages
+	char* buf = NULL;
+	int len = 0;
+	while((len = threadMsgRecv(coms, &buf)) >= 0) {
+		// execute the command.
+		clientCommandExec(clientServer, buf, len);
+		free(buf);
+		buf = NULL;
+	}
+	pthread_exit(NULL);
+	return;
+}
+
+int clientCommandExec(struct ServThread* server, char* cmd, int cmdlen){
+	if(!server || !cmd) {
+		return -1;
+	}
+
+	// commands are made to be readable.
+	// jk they are nonsense
+	char* buf[255];
+	int bufsize = strnsplit(cmd, cmdlen, ' ', buf);
+	if(bufsize < 0) {
+		return -1;
+	}
+
+	// exit
+	if(strncmp(buf[0], "exit", cmdlen) == 0) {
+		free(*buf);
+		return 0;
+	}
+
+	// send
+	send(server->info.sockfd, cmd, cmdlen, 0);
+	return 1;
+}
+
 
 #endif

@@ -149,7 +149,8 @@ int threadMsgRecv(struct ThreadMsg* coms, char** buf) {
 	// wait for notification
 	struct QueueEntry* entry = NULL;
 	while(!entry) {
-		pthread_cond_timedwait(&coms->ready, &coms->mlock, &ts);
+		//pthread_cond_timedwait(&coms->ready, &coms->mlock, &ts);
+		pthread_cond_wait(&coms->ready, &coms->mlock);
 		entry = STAILQ_FIRST(coms->mqueue);
 	}
 

@@ -30,7 +30,7 @@ int main() {
 	}
 
 	// free the server and exit
-	ServThreadFree(&leaderThread);
+	//ServThreadFree(&leaderThread);
 	termServer();
 	return 0;
 }

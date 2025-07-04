@@ -22,12 +22,17 @@ struct ServThread {
 };
 void ServThreadFree(struct ServThread** server); // free a ServThread* server. 
 
-// list of servers
+// list of servers with mutex
 struct ServListEntry {
 	struct ServThread* server;
 	SLIST_ENTRY(ServListEntry) servers;
 };
 SLIST_HEAD(ServList, ServListEntry);
+
+struct ServListSafe {
+	struct ServList servers;
+	pthread_mutex_t lock;
+};
 
 // init all startup stuff and global variables . 
 void initServer(void);
@@ -85,5 +90,25 @@ void  backupCommandProc(struct ServThread* backupServer);
 // 		free(*buf);
 // 	}
 int strnsplit(char* str, int len, char delim, char* buf[]);
+
+int backupCommandExec(struct ServThread* server, char* cmd, int cmdlen);
+
+// broadcast a message to a list of servers
+// @server : list of servers
+// @msg : what to say
+// @maxlen : size of the message, set <= 0 for strnlen
+void broadcastMsg(struct ServListSafe serverlist, char* msg, int maxlen);
+
+// execute a command for the leader
+// @cmd : Command
+// @cmdlen : maxsize of the command
+// #RETURN : negative on error, otherwise ID of the command.
+// 	-1 : invalid/error
+// 	0 : exit command
+// 	1 : broadcast-backup
+// 	2 : 
+int leaderCommandExec(char* cmd, int cmdlen);
+
+int clientCommandExec(struct ServThread* server, char* cmd, int cmdlen);
 
 #endif
