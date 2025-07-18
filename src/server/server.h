@@ -63,9 +63,8 @@ struct ServThread* procLeader(struct ServInfo info);
 // #RETURN : NULL on exit.
 void* leaderAcceptThread(void*);
 
-// Add a server to backupList or clientList and compute it.
-// @servInfo : struct ServThread that had info, tid, and tlen initialized beforehand.
-// #RETURN : NULL on exit.
+// add a server and start processing it based on backup or client
+// @servThread : pointer to the ServThread struct with info and tid setup before
 void* leaderAddServer(void* servThread);
 
 // more threads. yippeee

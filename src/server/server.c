@@ -34,7 +34,29 @@ void initServer(void) {
 
 // terminate all startup stuff.
 void termServer(void) {
+	// idpool
 	pthread_mutex_destroy(&idpool.lock);
+
+	// clientlist
+	pthread_mutex_lock(&clientList.lock);
+	struct ServListEntry* np = SLIST_FIRST(&clientList.servers);
+	while(np) {
+		struct ServListEntry* temp = SLIST_NEXT(np, servers);
+		free(np);
+		np = temp;
+	}
+
+	// backuplist
+	pthread_mutex_lock(&backupList.lock);
+	np = SLIST_FIRST(&backupList.servers);
+	while(np) {
+		struct ServListEntry* temp = SLIST_NEXT(np, servers);
+		free(np);
+		np = temp;
+	}
+
+	pthread_mutex_destroy(&backupList.lock);
+	pthread_mutex_unlock(&backupList.lock);
 }
 
 // get first available id.
@@ -220,14 +242,21 @@ void ServThreadFree(struct ServThread** server) {
 	// free stored pointers
 	close(sockfd);
 	clearId(contents->id);
+	pthread_mutex_lock(&coms->mlock);
 	MsgQueueFree(&coms->mqueue);
-	free(coms);
 	
-	// free struct
+	// cancel threads
 	for(int i = 0; i < contents->tlen; i++) {
 		pthread_cancel(contents->tid[i]);
 		pthread_join(contents->tid[i], NULL);
 	}
+
+	// free mutex
+	pthread_mutex_unlock(&coms->mlock);
+	pthread_mutex_destroy(&coms->mlock); // for the freebsd users, all 2 of them.
+	free(coms);
+
+	// free structs 
 	free(contents->tid);
 	free(contents);
 	*server = NULL;
@@ -262,84 +291,6 @@ int servThreadAdd(struct ServThread* server, void* (threadFunctions)(void*), ...
 	// success
 	va_end(ap);
 	return 1;
-}
-
-// Accept a new server and start its own thread
-// @leaderServer : ServThread of the leaderServer.
-// #RETURN : NULL on exit.
-void* leaderAcceptThread(void* leaderServer) {
-	// init
-	int *oldtype = NULL;
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
-	struct ServThread* server = (struct ServThread*)leaderServer;
-	
-	// init bufs
-	socklen_t addrlen;
-	struct sockaddr_in6 addr;
-	int sockfd;
-	
-	// For each new connection.
-	while((sockfd = accept(server->info.sockfd, (struct sockaddr*)&addr, &addrlen))) {
-		// Gather the information
-		struct ServInfo info = {
-			.sockfd = sockfd,
-			.addr = addr,
-			.addrlen = addrlen
-		};
-		// Start a new thread with it.
-		struct ServThread* servThread = malloc(sizeof(struct ServThread));
-		servThread->info = info;
-		servThread->tid = calloc(2, sizeof(pthread_t));
-		servThread->tlen = 2;
-		pthread_create(&servThread->tid[0], NULL, leaderAddServer, servThread);
-	}
-	
-	pthread_exit(NULL);
-}
-
-const struct timeval newServTimeout = {
-	.tv_sec = 5,
-	.tv_usec = 0
-};
-
-// Add a server to backupList or clientList and compute it.
-// @servInfo : struct ServThread that had info, tid, and tlen initialized beforehand.
-// #RETURN : NULL on exit.
-void* leaderAddServer(void* servThread) {
-	int *oldtype = NULL;
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
-	
-	// set a heartbeat.
-	struct ServThread* thread = (struct ServThread*)servThread;
-	int sockfd = thread->info.sockfd;
-	//setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &newServTimeout, sizeof(newServTimeout));
-
-	// first connection must be made within 5 seconds.
-	char buf[1024];
-	if(recv(sockfd, buf, 1024, 0) < 0) {
-		pthread_exit(NULL);
-	}
-
-	// init
-	thread->coms = ThreadMsgCreat();
-	thread->id = getId();
-	if(strncmp(buf, "client", 1024) == 0) {
-		// start processing as a client server
-		pthread_create(&thread->tid[1], NULL, clientRecvThread, thread);
-		clientCommandProc(thread);
-		pthread_exit(NULL);
-	} else if(strncmp(buf, "backup", 1024) == 0) {
-		// start processing as a backup server
-		pthread_create(&thread->tid[1], NULL, backupRecvThread, thread);
-		backupCommandProc(thread);
-	} else {
-		// invalid
-		thread->tlen--;
-	}
-
-	// free and exit
-	ServThreadFree(&thread);
-	pthread_exit(NULL);
 }
 
 // split a string into multiple strings
@@ -381,63 +332,10 @@ int strnsplit(char* str, int len, char delim, char* buf[]) {
 		buf[i] = cpy;
 	}
 	buf[i+1] = NULL;
-	
+
+	// free copy
 	return i;
 }
-
-void backupCommandProc(struct ServThread* backupServer) {
-	errno = 0;
-	// sanitize
-	if(!backupServer) {
-		return;
-	}
-
-	// add to the list
-	struct ServListEntry* entry = malloc(sizeof(struct ServListEntry));
-	if(!entry) {
-		errno = ENOMEM;
-		free(backupServer);
-		return;
-	}
-	entry->server = backupServer;
-	pthread_mutex_lock(&backupList.lock);
-	SLIST_INSERT_HEAD(&backupList.servers, entry, servers);
-	pthread_mutex_unlock(&backupList.lock);
-
-	// init
-	struct ThreadMsg* coms = backupServer->coms;
-
-	// while getting messages
-	char* buf = NULL;
-	int len = 0;
-	while((len = threadMsgRecv(coms, &buf)) >= 0) {
-		// execute the command.
-		backupCommandExec(backupServer, buf, len);
-		free(buf);
-		buf = NULL;
-	}
-	pthread_exit(NULL);
-	return;
-}
-
-void* backupRecvThread(void* backupServer) {
-	struct ServThread* server = (struct ServThread*)backupServer;
-	int sockfd = server->info.sockfd;
-	
-	// while getting messages.
-	char buf[1024] = { 0 };
-	while(recv(sockfd, buf, 1024, 0) >= 0) {
-		// print them.
-		if(!buf[0]) {
-			continue;
-		}
-		printf("%s\n", buf);
-		buf[0] = '\0';
-	}
-	printf("%s\n", "done");
-	pthread_exit(NULL);
-}
-
 
 // execute a command for the leader
 // @cmd : Command
@@ -490,6 +388,7 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 	cmd -= cmdlen;
 	printf("%s\n", cmd);
 
+	free(*buf);
 	return -1;
 }
 
@@ -517,105 +416,67 @@ void broadcastMsg(struct ServListSafe serverlist, char* msg, int maxlen) {
 	pthread_mutex_unlock(&backupList.lock);
 }
 
-int backupCommandExec(struct ServThread* server, char* cmd, int cmdlen){
-	if(!server || !cmd) {
-		return -1;
+// Accept a new server and start its own thread
+// @leaderServer : ServThread of the leaderServer.
+// #RETURN : NULL on exit.
+void* leaderAcceptThread(void* leaderServer) {
+	// init
+	int *oldtype = NULL;
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
+	struct ServThread* server = (struct ServThread*)leaderServer;
+	
+	// init bufs
+	socklen_t addrlen = 0;
+	struct sockaddr_in6 addr = {0};
+	int sockfd;
+	
+	// For each new connection.
+	while((sockfd = accept(server->info.sockfd, (struct sockaddr*)&addr, &addrlen))) {
+		// Gather the information
+		struct ServInfo* info = malloc(sizeof(struct ServInfo));
+		*info = (struct ServInfo){
+			.sockfd = sockfd,
+			.addr = addr,
+			.addrlen = addrlen
+		};
+		// Start a new thread with it.
+		pthread_t tid;
+		pthread_create(&tid, NULL, leaderAddServer, info);
+		pthread_detach(tid);
 	}
-
-	// commands are made to be readable.
-	// jk they are nonsense
-	char* buf[255];
-	int bufsize = strnsplit(cmd, cmdlen, ' ', buf);
-	if(bufsize < 0) {
-		return -1;
-	}
-
-	// exit
-	if(strncmp(buf[0], "exit", cmdlen) == 0) {
-		free(*buf);
-		return 0;
-	}
-
-	// send
-	send(server->info.sockfd, cmd, cmdlen, 0);
-	return 1;
+	
+	pthread_exit(NULL);
 }
 
-void* clientRecvThread(void* clientServer) {
-	if(!clientServer) {
+// timeout for recv
+struct timeval tv = {
+	.tv_sec = 1,
+	.tv_usec = 0
+};
+// add a server and start processing it based on backup or client
+// @servThread : pointer to the ServThread struct with info and tid setup before
+void* leaderAddServer(void* servInfo) {
+	// init
+	struct ServThread* servThread = malloc(sizeof(struct ServThread));
+	struct ServInfo info = *(struct ServInfo*)servInfo;
+	free(servInfo);
+	servThread->info = info;
+	servThread->tid = calloc(2, sizeof(pthread_t));
+	servThread->tlen = 1;
+	setsockopt(info.sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+	// get first message to see if valid
+	char firstMsg[255];
+
+	int status = recv(info.sockfd, firstMsg, 255, 0);
+	if(status <= 0) {
+		// timeout
+		free(servThread->tid);
+		free(servThread);
 		pthread_exit(NULL);
 	}
-	// init
-	struct ServThread* server = (struct ServThread*)clientServer;
-	int sockfd = server->info.sockfd;
 
-	// while getting string
-	char buf[1024];
-	while(recv(sockfd, buf, 1024, 0) > 0) {
-		// send it to leader
-		threadMsgSend(leader->coms, buf, 0);
-	}
 	pthread_exit(NULL);
 }
-
-void clientCommandProc(struct ServThread* clientServer) {
-	errno = 0;
-	// sanitize
-	if(!clientServer) {
-		return;
-	}
-
-	// add to the list
-	struct ServListEntry* entry = malloc(sizeof(struct ServListEntry));
-	if(!entry) {
-		errno = ENOMEM;
-		free(clientServer);
-		return;
-	}
-	entry->server = clientServer;
-	pthread_mutex_lock(&clientList.lock);
-	SLIST_INSERT_HEAD(&clientList.servers, entry, servers);
-	pthread_mutex_unlock(&clientList.lock);
-
-	// init
-	struct ThreadMsg* coms = clientServer->coms;
-
-	// while getting messages
-	char* buf = NULL;
-	int len = 0;
-	while((len = threadMsgRecv(coms, &buf)) >= 0) {
-		// execute the command.
-		clientCommandExec(clientServer, buf, len);
-		free(buf);
-		buf = NULL;
-	}
-	pthread_exit(NULL);
-	return;
-}
-
-int clientCommandExec(struct ServThread* server, char* cmd, int cmdlen){
-	if(!server || !cmd) {
-		return -1;
-	}
-
-	// commands are made to be readable.
-	// jk they are nonsense
-	char* buf[255];
-	int bufsize = strnsplit(cmd, cmdlen, ' ', buf);
-	if(bufsize < 0) {
-		return -1;
-	}
-
-	// exit
-	if(strncmp(buf[0], "exit", cmdlen) == 0) {
-		free(*buf);
-		return 0;
-	}
-
-	// send
-	send(server->info.sockfd, cmd, cmdlen, 0);
-	return 1;
-}
-
 
 #endif
