@@ -22,16 +22,11 @@ int main() {
 	if(status < 0) {
 		perror("connect");
 	}
-	sleep(5);
-	return 0;
-	//send(sockfd, "backup", sizeof "backup", 0);
+	send(sockfd, "backup", sizeof "backup", 0);
 
 	char buf[255];
-	int len;
-	while((len = recv(sockfd, buf, 255, 0)) > 0) {
-		buf[len] = '\0';
-		printf("%s\n", buf);
-		break;
+	while(fgets(buf, 255, stdin)) {
+		send(sockfd, buf, 255, 0);
 	}
 	return 0;
 }

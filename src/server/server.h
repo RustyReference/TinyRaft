@@ -67,12 +67,6 @@ void* leaderAcceptThread(void*);
 // @servThread : pointer to the ServThread struct with info and tid setup before
 void* leaderAddServer(void* servThread);
 
-// more threads. yippeee
-void* clientRecvThread(void*);
-void  clientCommandProc(struct ServThread* clientServer);
-void* backupRecvThread(void*);
-void  backupCommandProc(struct ServThread* backupServer);
-
 // split a string into multiple strings
 // @str : string you wish to split.
 // @len : max lenght of the str
@@ -104,10 +98,29 @@ void broadcastMsg(struct ServListSafe serverlist, char* msg, int maxlen);
 // #RETURN : negative on error, otherwise ID of the command.
 // 	-1 : invalid/error
 // 	0 : exit command
-// 	1 : broadcast-backup
-// 	2 : 
+// 	ID of the command just executed otherwise.
 int leaderCommandExec(char* cmd, int cmdlen);
 
-int clientCommandExec(struct ServThread* server, char* cmd, int cmdlen);
+// Start recieving on a ServThread's socket and execute incoming requests
+// @backupThread : pointer to a servThread with info initialized beforehand.
+// #RETURN : Nothing
+// NOTES : Will start a backupCommandThread and free everything once socket closes.
+void backupRecv(struct ServThread* backupThread);
+
+// Execute backup commands for a thread
+// @backupThread : Thread to recieve commands for.
+// #RETURN : NULL on exit
+// NOTES
+// 	backupRecv has an example usage. In fact use backupRecv what are you looking at this function for?
+void* backupCommandThread(void* backupThread);
+
+// Add servThread to servList.
+// @servList : clientList or backupList.
+// @servThread : the thread complete with tid and all.
+// #RETURN : 0 on error and 1 on success
+// NOTES
+// 	This function steals the servThread pointer. You may not free it anymore. DO NOT FREE SERVTHREAD AFTER ITS BEEN ADDED.
+//
+int addServListSafe(struct ServListSafe* servList, struct ServThread* servThread);
 
 #endif

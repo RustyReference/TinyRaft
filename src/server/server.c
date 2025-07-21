@@ -51,6 +51,8 @@ void termServer(void) {
 	np = SLIST_FIRST(&backupList.servers);
 	while(np) {
 		struct ServListEntry* temp = SLIST_NEXT(np, servers);
+		// free(np);
+		ServThreadFree(&np->server);
 		free(np);
 		np = temp;
 	}
@@ -154,10 +156,13 @@ void* leaderCommandThread(void* leaderServer) {
 	char* buf = NULL;
 	int len = 0;
 	while((len = threadMsgRecv(coms, &buf)) >= 0) {
-		leaderCommandExec(buf, len);
+		if(!leaderCommandExec(buf, len)) {
+			break;
+		}
 		free(buf);
 		buf = NULL;
 	}
+	free(buf);
 	pthread_exit(NULL);
 }
 
@@ -237,8 +242,10 @@ struct ServThread* procLeader(struct ServInfo info) {
 void ServThreadFree(struct ServThread** server) {
 	struct ServThread* contents = *server;
 	struct ThreadMsg* coms = contents->coms;
+
+	//threadMsgSend(coms, "exit", 0); // :3
 	int sockfd = contents->info.sockfd;
-	
+
 	// free stored pointers
 	close(sockfd);
 	clearId(contents->id);
@@ -250,6 +257,7 @@ void ServThreadFree(struct ServThread** server) {
 		pthread_cancel(contents->tid[i]);
 		pthread_join(contents->tid[i], NULL);
 	}
+	
 
 	// free mutex
 	pthread_mutex_unlock(&coms->mlock);
@@ -260,37 +268,6 @@ void ServThreadFree(struct ServThread** server) {
 	free(contents->tid);
 	free(contents);
 	*server = NULL;
-}
-
-// Start some threads for a server. 
-// @server : Threads will be put on this ServThread
-// @threadFunc : This function will be called with server as the only arg.
-// #RETURN : 0 on error and 1 on success.
-int servThreadAdd(struct ServThread* server, void* (threadFunctions)(void*), ...) {
-	va_list ap;
-	va_start(ap, threadFunctions);
-	int i, err = -1;
-	// make each function
-	for(i = 0; *threadFunctions; i++) {
-		void* nextFunction = va_arg(ap, void*);
-		if(pthread_create(&server->tid[i], NULL, nextFunction, NULL)) {
-			// abort
-			err = i; // This is a headache...
-			break;
-		}
-	}
-	// don't really have to read this
-	if(err >= 0) {
-		// undo everything and exit
-		for(int i = 0; i <= err; i--) {	
-			pthread_cancel(server->tid[i]);
-			pthread_join(server->tid[i], NULL);
-		}
-		return 0;
-	}
-	// success
-	va_end(ap);
-	return 1;
 }
 
 // split a string into multiple strings
@@ -431,7 +408,7 @@ void* leaderAcceptThread(void* leaderServer) {
 	int sockfd;
 	
 	// For each new connection.
-	while((sockfd = accept(server->info.sockfd, (struct sockaddr*)&addr, &addrlen))) {
+	while((sockfd = accept(server->info.sockfd, (struct sockaddr*)&addr, &addrlen)) > 0) {
 		// Gather the information
 		struct ServInfo* info = malloc(sizeof(struct ServInfo));
 		*info = (struct ServInfo){
@@ -439,6 +416,7 @@ void* leaderAcceptThread(void* leaderServer) {
 			.addr = addr,
 			.addrlen = addrlen
 		};
+
 		// Start a new thread with it.
 		pthread_t tid;
 		pthread_create(&tid, NULL, leaderAddServer, info);
@@ -448,35 +426,114 @@ void* leaderAcceptThread(void* leaderServer) {
 	pthread_exit(NULL);
 }
 
-// timeout for recv
-struct timeval tv = {
-	.tv_sec = 1,
-	.tv_usec = 0
-};
 // add a server and start processing it based on backup or client
 // @servThread : pointer to the ServThread struct with info and tid setup before
 void* leaderAddServer(void* servInfo) {
+	int *oldtype = NULL;
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype); 
+
 	// init
 	struct ServThread* servThread = malloc(sizeof(struct ServThread));
-	struct ServInfo info = *(struct ServInfo*)servInfo;
+	servThread->info = *(struct ServInfo*)servInfo;
+	int sockfd = servThread->info.sockfd;
 	free(servInfo);
-	servThread->info = info;
-	servThread->tid = calloc(2, sizeof(pthread_t));
-	servThread->tlen = 1;
-	setsockopt(info.sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+	// timeout for recv
+	const struct timeval tv = {
+		.tv_sec = 1,
+		.tv_usec = 0
+	};
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	// get first message to see if valid
 	char firstMsg[255];
-
-	int status = recv(info.sockfd, firstMsg, 255, 0);
+	int status = recv(sockfd, firstMsg, 255, 0);
 	if(status <= 0) {
 		// timeout
-		free(servThread->tid);
 		free(servThread);
 		pthread_exit(NULL);
 	}
 
+	if(strncmp(firstMsg, "backup", 255) == 0) {
+		// add to backupList
+		addServListSafe(&backupList, servThread);
+		backupRecv(servThread);
+	} 
 	pthread_exit(NULL);
+}
+
+void backupRecv(struct ServThread* backupThread) {
+	// set an id and start command thread
+	backupThread->id = getId();
+	backupThread->tlen = 0;
+	backupThread->tid = calloc(1, sizeof(pthread_t));
+//	backupThread->tid[0] = pthread_self();
+	//pthread_create(&backupThread->tid[0], NULL, backupCommandThread, backupThread);
+
+	// set coms
+	backupThread->coms = ThreadMsgCreat();
+
+	// no timeout for recv
+	int sockfd = backupThread->info.sockfd;
+	const struct timeval tv = {
+		.tv_sec = 0,
+		.tv_usec = 0
+	};
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+	// start recieving requests
+	char buf[1024];
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	pthread_exit(NULL);
+	while(recv(sockfd, buf, 1024, 0) > 0) {
+		*strchrnul(buf, '\n') = '\0';
+	}
+
+	ServThreadFree(&backupThread);
+	return;
+}
+
+void* backupCommandThread([[maybe_unused]]void* backupThread) {
+	int *oldtype = NULL;
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype); 
+	pthread_exit(NULL);
+
+	// init
+	struct ServThread* thread = backupThread;
+	struct ThreadMsg* coms = thread->coms;
+	char* buf = NULL;
+	int len = 0;
+	while( (len = threadMsgRecv(coms, &buf) >= 0) ) {
+		if(strncmp(buf, "exit", len) == 0) {
+			break;
+		}
+		send(thread->info.sockfd, buf, len, 0);
+	}
+	pthread_exit(NULL);
+}
+
+// Add servThread to servList.
+// @servList : clientList or backupList.
+// @servThread : the thread complete with tid and all.
+// #RETURN : 0 on error and 1 on success
+// NOTES
+// 	This function steals the servThread pointer. You may not free it anymore. 
+// 	DO NOT FREE SERVTHREAD AFTER ITS BEEN ADDED.
+int addServListSafe(struct ServListSafe* servList, struct ServThread* servThread) {
+	// sanitize
+	if(!servList || !servThread) {
+		return 0;
+	}
+
+	// init 
+	pthread_mutex_lock(&servList->lock);
+	struct ServListEntry* entry = malloc(sizeof(struct ServListEntry));
+	entry->server = servThread;
+	SLIST_INSERT_HEAD(&servList->servers, entry, servers);
+	pthread_mutex_unlock(&servList->lock);
+
+	// exit
+	return 1; 
 }
 
 #endif
