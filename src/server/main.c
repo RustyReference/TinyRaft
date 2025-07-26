@@ -23,10 +23,10 @@ int main() {
 	char buf[255];
 	while(fgets(buf, 255, stdin)) {
 		*strchrnul(buf, '\n') = '\0';
-		threadMsgSend(leaderThread->coms, buf, 0);
 		if(strncmp(buf, "exit", 255) == 0) {
 			break;
 		}
+		threadMsgSend(leaderThread->coms, buf, 0);
 	}
 
 	// free the server and exit

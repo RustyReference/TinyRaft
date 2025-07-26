@@ -13,7 +13,7 @@
 struct {
 	int ids[MAXID];
 	pthread_mutex_t lock;
-} idpool;
+} idpool = { 0 };
 
 // list of servers
 struct ServListSafe clientList, backupList;
@@ -34,9 +34,6 @@ void initServer(void) {
 
 // terminate all startup stuff.
 void termServer(void) {
-	// idpool
-	pthread_mutex_destroy(&idpool.lock);
-
 	// clientlist
 	pthread_mutex_lock(&clientList.lock);
 	struct ServListEntry* np = SLIST_FIRST(&clientList.servers);
@@ -59,6 +56,10 @@ void termServer(void) {
 
 	pthread_mutex_destroy(&backupList.lock);
 	pthread_mutex_unlock(&backupList.lock);
+
+	// idpool
+	pthread_mutex_destroy(&idpool.lock);
+
 }
 
 // get first available id.
@@ -249,20 +250,19 @@ void ServThreadFree(struct ServThread** server) {
 	// free stored pointers
 	close(sockfd);
 	clearId(contents->id);
+	threadMsgSend(coms, "exit", 0);
 	pthread_mutex_lock(&coms->mlock);
-	MsgQueueFree(&coms->mqueue);
 	
 	// cancel threads
 	for(int i = 0; i < contents->tlen; i++) {
 		pthread_cancel(contents->tid[i]);
 		pthread_join(contents->tid[i], NULL);
 	}
-	
 
 	// free mutex
 	pthread_mutex_unlock(&coms->mlock);
 	pthread_mutex_destroy(&coms->mlock); // for the freebsd users, all 2 of them.
-	free(coms);
+	ThreadMsgFree(&coms);
 
 	// free structs 
 	free(contents->tid);
@@ -428,6 +428,7 @@ void* leaderAcceptThread(void* leaderServer) {
 
 // add a server and start processing it based on backup or client
 // @servThread : pointer to the ServThread struct with info and tid setup before
+// #RETURN : NULL
 void* leaderAddServer(void* servInfo) {
 	int *oldtype = NULL;
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype); 
@@ -462,13 +463,17 @@ void* leaderAddServer(void* servInfo) {
 	pthread_exit(NULL);
 }
 
+// Recieve communications from a command to process backupThread. 
+// Will automatically free backupThread once backup disconnects, error or otherwise.
+// @backupThread : ServThread with info ready. Will steal the pointer.
+// #NOTES
+// 	Steals the one and only pointer, do not free anything.
 void backupRecv(struct ServThread* backupThread) {
 	// set an id and start command thread
 	backupThread->id = getId();
-	backupThread->tlen = 0;
 	backupThread->tid = calloc(1, sizeof(pthread_t));
-//	backupThread->tid[0] = pthread_self();
 	//pthread_create(&backupThread->tid[0], NULL, backupCommandThread, backupThread);
+	backupThread->tlen = 0;
 
 	// set coms
 	backupThread->coms = ThreadMsgCreat();
@@ -489,14 +494,18 @@ void backupRecv(struct ServThread* backupThread) {
 		*strchrnul(buf, '\n') = '\0';
 	}
 
-	ServThreadFree(&backupThread);
+	//ServThreadFree(&backupThread);
 	return;
 }
 
-void* backupCommandThread([[maybe_unused]]void* backupThread) {
+// Start processing commands for a backupThread in their own thread.
+// @backupThread : ServThread fully setup and ready.
+// #RETURN : NULL
+// NOTES 
+// 	Communicate while running using the coms inside backupThread.
+void* backupCommandThread(void* backupThread) {
 	int *oldtype = NULL;
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype); 
-	pthread_exit(NULL);
 
 	// init
 	struct ServThread* thread = backupThread;
@@ -509,6 +518,7 @@ void* backupCommandThread([[maybe_unused]]void* backupThread) {
 		}
 		send(thread->info.sockfd, buf, len, 0);
 	}
+	thread->tlen = 0;
 	pthread_exit(NULL);
 }
 

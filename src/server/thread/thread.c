@@ -108,7 +108,7 @@ int threadMsgSend(struct ThreadMsg* coms, char* msg, int len) {
 	if(!coms || !msg) {
 		errno = EINVAL;
 		return 0;
-	}
+	} 
 	if(len <= 0) {
 		len = strnlen(msg, 1024)+1;
 	}
