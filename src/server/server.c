@@ -314,6 +314,35 @@ int strnsplit(char* str, int len, char delim, char* buf[]) {
 	return i;
 }
 
+//TODO: DELETE AFTER DEMO
+// write foo = goo to db.
+char fooList[255][25] = { 0 };
+char gooList[255][25] = { 0 };
+void dbwrite(char foo[], char goo[]) {
+  // select valid foo
+  int i = 0;
+  while(i < 255) {
+    if(strncmp(fooList[i], "", 1) == 0 || strncmp(fooList[i], foo, 25) == 0) {
+      break;
+    }
+    i++;
+  }
+  if(i > 255) {
+    return;
+  }
+  strncpy(fooList[i], foo, 25);
+  strncpy(gooList[i], goo, 25);
+}
+int dbRead(char foo[], char buf[]) {
+  for(int i = 0; i < 255; i++) {
+    if(strncmp(fooList[i], foo, 25) == 0) {
+      strncpy(buf, gooList[i], 25);
+      return 1;
+    }
+  }
+  return 0;
+}
+
 // execute a command for the leader
 // @cmd : Command
 // @cmdlen : maxsize of the command
@@ -358,8 +387,25 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 	if(strncmp(buf[0], "client-all", firstlen) == 0) {
 		broadcastMsg(clientList, cmd, 0);
 		free(*buf);
-		return 1;
+		return 2;
 	}
+
+  //TODO: DELETE AFTER DEMO
+  if(strncmp(buf[0], "write", firstlen) == 0) {
+    dbwrite(buf[1], buf[3]);
+		broadcastMsg(backupList, cmd, 0);
+    free(*buf);
+    return 5;
+  } else if(strncmp(buf[0], "read", firstlen) == 0) {
+    char dbuf[25] = { 0 };
+    if(dbRead(buf[1], dbuf)) {
+		  broadcastMsg(clientList, dbuf, 0);
+    } else {
+      printf("%s\n", "No value found.");
+    }
+    free(*buf);
+    return 4;
+  }
 
 	// end of redirections.
 	cmd -= firstlen;
@@ -618,7 +664,7 @@ void* clientCommandThread(void* clientThread) {
 	int len = 0;
 	while( (len = threadMsgRecv(coms, &buf) >= 0) ) {
 		// just necessary for clientCommandThread only for some reason.
-		printf("client says %s\n", buf);
+    send(thread->info.sockfd, buf, strlen(buf)+1, 0);
 		//send(thread->info.sockfd, buf, strnlen(buf, 1024)+1, 0);
 		free(buf);
 	}
