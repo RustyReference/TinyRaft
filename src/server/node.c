@@ -53,7 +53,7 @@ int start_node(char *address, int port) {
  * @param option the command line option to parse
  * @return 0 if success; 1 otherwise
  */
-int populate_peers(Config *config, char *option) {
+void populate_peers(Config *config, char *option) {
 	errno = 0;
 	char *dup, *token;
 	dup = strdup_checked(option);
@@ -79,7 +79,6 @@ int populate_peers(Config *config, char *option) {
 	}
 	
 	free(dup);	// Free copy of peer option string
-	return 0;
 }
 
 /**
@@ -152,10 +151,10 @@ void test() {
 int main(int argc, char *argv[]) {
 	Config config = {0};
 	Peer_arr *peers;
-	parse_args(&config, argc, argv);	// Must free at the end
+	parse_args(&config, argc, argv);	
 	peers = get_peers(&config);			// Must free at the end
 	free_config_static(&config);
-	
+
 
 	/*
 	test();
