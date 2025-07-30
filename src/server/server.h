@@ -117,10 +117,24 @@ void* backupCommandThread(void* backupThread);
 // Add servThread to servList.
 // @servList : clientList or backupList.
 // @servThread : the thread complete with tid and all.
-// #RETURN : 0 on error and 1 on success
+// #RETURN : NULL on error and entry on success
 // NOTES
-// 	This function steals the servThread pointer. You may not free it anymore. DO NOT FREE SERVTHREAD AFTER ITS BEEN ADDED.
-//
-int addServListSafe(struct ServListSafe* servList, struct ServThread* servThread);
+// 	This function steals the servThread pointer. You may not free it anymore. 
+// 	DO NOT FREE SERVTHREAD AFTER ITS BEEN ADDED WITHOUT REMOVING FIRST.
+struct ServListEntry* addServListSafe(struct ServListSafe* servList, struct ServThread* servThread);
+
+// Recieve communications from a command to process clientThread. 
+// Will automatically free clientThread once backup disconnects, error or otherwise.
+// @clientThread : ServThread with info ready. Will steal the pointer.
+// #NOTES
+// 	Steals the one and only pointer, do not free anything.
+void clientRecv(struct ServThread* clientThread);
+
+// Execute backup commands for a thread
+// @backupThread : Thread to recieve commands for.
+// #RETURN : NULL on exit
+// NOTES
+// 	clientRecv has an example usage. In fact use backupRecv what are you looking at this function for?
+void* clientCommandThread(void* clientThread);
 
 #endif

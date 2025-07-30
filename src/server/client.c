@@ -27,7 +27,9 @@ int main() {
 	char buf[255];
 	while(fgets(buf, 255, stdin)) {
 		*strchrnul(buf, '\n') = '\0';
-		send(sockfd, buf, 255, 0);
+		if(send(sockfd, buf, 255, 0) < 0) {
+			break;
+		}
 	}
 	return 0;
 }

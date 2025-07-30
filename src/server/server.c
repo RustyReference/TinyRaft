@@ -39,6 +39,7 @@ void termServer(void) {
 	struct ServListEntry* np = SLIST_FIRST(&clientList.servers);
 	while(np) {
 		struct ServListEntry* temp = SLIST_NEXT(np, servers);
+		ServThreadFree(&np->server);
 		free(np);
 		np = temp;
 	}
@@ -151,6 +152,7 @@ void* leaderCommandThread(void* leaderServer) {
 	}
 	// init
 	struct ServThread* server = (struct ServThread*)leaderServer;
+	leader = server;
 	struct ThreadMsg* coms = server->coms;
 
 	// while getting messages
@@ -244,14 +246,12 @@ void ServThreadFree(struct ServThread** server) {
 	struct ServThread* contents = *server;
 	struct ThreadMsg* coms = contents->coms;
 
-	//threadMsgSend(coms, "exit", 0); // :3
 	int sockfd = contents->info.sockfd;
 
 	// free stored pointers
 	close(sockfd);
 	clearId(contents->id);
-	threadMsgSend(coms, "exit", 0);
-	pthread_mutex_lock(&coms->mlock);
+	//pthread_mutex_lock(&coms->mlock);
 	
 	// cancel threads
 	for(int i = 0; i < contents->tlen; i++) {
@@ -260,7 +260,7 @@ void ServThreadFree(struct ServThread** server) {
 	}
 
 	// free mutex
-	pthread_mutex_unlock(&coms->mlock);
+//	pthread_mutex_unlock(&coms->mlock);
 	pthread_mutex_destroy(&coms->mlock); // for the freebsd users, all 2 of them.
 	ThreadMsgFree(&coms);
 
@@ -355,14 +355,14 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 	}
 
 	// client-all
-	if(strncmp(buf[0], "backup-all", firstlen) == 0) {
+	if(strncmp(buf[0], "client-all", firstlen) == 0) {
 		broadcastMsg(clientList, cmd, 0);
 		free(*buf);
 		return 1;
 	}
 
 	// end of redirections.
-	cmd -= cmdlen;
+	cmd -= firstlen;
 	printf("%s\n", cmd);
 
 	free(*buf);
@@ -456,9 +456,13 @@ void* leaderAddServer(void* servInfo) {
 	}
 
 	if(strncmp(firstMsg, "backup", 255) == 0) {
-		// add to backupList
-		addServListSafe(&backupList, servThread);
+		// add to backupList and process it
 		backupRecv(servThread);
+	} 
+
+	if(strncmp(firstMsg, "client", 255) == 0) {
+		// add to backupList and process it 
+		clientRecv(servThread);
 	} 
 	pthread_exit(NULL);
 }
@@ -469,11 +473,13 @@ void* leaderAddServer(void* servInfo) {
 // #NOTES
 // 	Steals the one and only pointer, do not free anything.
 void backupRecv(struct ServThread* backupThread) {
+	struct ServListEntry* np = addServListSafe(&backupList, backupThread);
 	// set an id and start command thread
 	backupThread->id = getId();
-	backupThread->tid = calloc(1, sizeof(pthread_t));
-	//pthread_create(&backupThread->tid[0], NULL, backupCommandThread, backupThread);
-	backupThread->tlen = 0;
+	backupThread->tid = calloc(2, sizeof(pthread_t));
+	pthread_create(&backupThread->tid[0], NULL, backupCommandThread, backupThread);
+  backupThread->tid[1] = pthread_self();
+	backupThread->tlen = 2;
 
 	// set coms
 	backupThread->coms = ThreadMsgCreat();
@@ -489,13 +495,19 @@ void backupRecv(struct ServThread* backupThread) {
 	// start recieving requests
 	char buf[1024];
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-	pthread_exit(NULL);
 	while(recv(sockfd, buf, 1024, 0) > 0) {
 		*strchrnul(buf, '\n') = '\0';
+		// TODO: backupCommandExec
 	}
 
-	//ServThreadFree(&backupThread);
-	return;
+	// Remove from list and exit
+	pthread_mutex_lock(&backupList.lock);
+	SLIST_REMOVE(&backupList.servers, np, ServListEntry, servers);
+	free(np);
+	pthread_mutex_unlock(&backupList.lock);
+	backupThread->tlen--;
+	ServThreadFree(&backupThread);
+  pthread_exit(NULL);
 }
 
 // Start processing commands for a backupThread in their own thread.
@@ -513,26 +525,26 @@ void* backupCommandThread(void* backupThread) {
 	char* buf = NULL;
 	int len = 0;
 	while( (len = threadMsgRecv(coms, &buf) >= 0) ) {
-		if(strncmp(buf, "exit", len) == 0) {
-			break;
-		}
-		send(thread->info.sockfd, buf, len, 0);
+		// just necessary for backupCommandThread only for some reason.
+		send(thread->info.sockfd, buf, strnlen(buf, 1024)+1, 0);
+		free(buf);
 	}
-	thread->tlen = 0;
+	thread->tlen--;
+  thread->tid[0] = thread->tid[1]; // ?
 	pthread_exit(NULL);
 }
 
 // Add servThread to servList.
 // @servList : clientList or backupList.
 // @servThread : the thread complete with tid and all.
-// #RETURN : 0 on error and 1 on success
+// #RETURN : NULL on error and entry on success
 // NOTES
 // 	This function steals the servThread pointer. You may not free it anymore. 
-// 	DO NOT FREE SERVTHREAD AFTER ITS BEEN ADDED.
-int addServListSafe(struct ServListSafe* servList, struct ServThread* servThread) {
+// 	DO NOT FREE SERVTHREAD AFTER ITS BEEN ADDED WITHOUT REMOVING FIRST.
+struct ServListEntry* addServListSafe(struct ServListSafe* servList, struct ServThread* servThread) {
 	// sanitize
 	if(!servList || !servThread) {
-		return 0;
+		return NULL;
 	}
 
 	// init 
@@ -543,7 +555,76 @@ int addServListSafe(struct ServListSafe* servList, struct ServThread* servThread
 	pthread_mutex_unlock(&servList->lock);
 
 	// exit
-	return 1; 
+	return entry; 
+}
+
+// Recieve communications from a command to process clientThread. 
+// Will automatically free clientThread once backup disconnects, error or otherwise.
+// @clientThread : ServThread with info ready. Will steal the pointer.
+// #NOTES
+// 	Steals the one and only pointer, do not free anything.
+void clientRecv(struct ServThread* clientThread) {
+	struct ServListEntry* np = addServListSafe(&clientList, clientThread);
+	// set an id and start command thread
+	clientThread->id = getId();
+	clientThread->tid = calloc(2, sizeof(pthread_t));
+	pthread_create(&clientThread->tid[0], NULL, clientCommandThread, clientThread);
+  clientThread->tid[1] = pthread_self();
+	clientThread->tlen = 2;
+
+	// set coms
+	clientThread->coms = ThreadMsgCreat();
+
+	// no timeout for recv
+	int sockfd = clientThread->info.sockfd;
+	const struct timeval tv = {
+		.tv_sec = 0,
+		.tv_usec = 0
+	};
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+	// start recieving requests
+	char buf[1024];
+	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	while(recv(sockfd, buf, 1024, 0) > 0) {
+		*strchrnul(buf, '\n') = '\0';
+		// TODO: clinetCommandExec
+		//printf("client at %s says %s\n", "address", buf);
+		threadMsgSend(leader->coms, buf, 0);
+	}
+
+	// Remove from list and exit
+	pthread_mutex_lock(&clientList.lock);
+	SLIST_REMOVE(&clientList.servers, np, ServListEntry, servers);
+	pthread_mutex_unlock(&clientList.lock);
+	ServThreadFree(&clientThread);
+  clientThread->tlen--;
+	pthread_exit(NULL);
+}
+
+// Start processing commands for a clientThread in their own thread.
+// @clientThread : ServThread fully setup and ready.
+// #RETURN : NULL
+// NOTES 
+// 	Communicate while running using the coms inside clientThread.
+void* clientCommandThread(void* clientThread) {
+	int *oldtype = NULL;
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype); 
+
+	// init
+	struct ServThread* thread = clientThread;
+	struct ThreadMsg* coms = thread->coms;
+	char* buf = NULL;
+	int len = 0;
+	while( (len = threadMsgRecv(coms, &buf) >= 0) ) {
+		// just necessary for clientCommandThread only for some reason.
+		printf("client says %s\n", buf);
+		//send(thread->info.sockfd, buf, strnlen(buf, 1024)+1, 0);
+		free(buf);
+	}
+	thread->tlen--;
+  thread->tid[0] = thread->tid[1]; // ?
+	pthread_exit(NULL);
 }
 
 #endif

@@ -2,6 +2,7 @@
 #include <string.h>
 #include "server.h"
 #include <wait.h>
+#include <arpa/inet.h>
 
 int main() {
 	initServer();
@@ -19,6 +20,9 @@ int main() {
 		termServer();
 		return 0;
 	}
+	char ipAddr[255];
+	inet_ntop(AF_INET6, &leaderServer.addr, ipAddr, 255);
+	printf("starting leader server at %s\n", ipAddr);
 
 	char buf[255];
 	while(fgets(buf, 255, stdin)) {
@@ -31,6 +35,8 @@ int main() {
 
 	// free the server and exit
 	ServThreadFree(&leaderThread);
+	sleep(1);
 	termServer();
+	sleep(1);
 	return 0;
 }
