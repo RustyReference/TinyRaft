@@ -32,6 +32,14 @@ void initServer(void) {
 	pthread_mutex_init(&idpool.lock, NULL);
 }
 
+/**
+ * Initializes the global command indexing variable
+ */
+void initIndex() {
+	indexer.ind = 0;
+    pthread_mutex_init(&indexer.lock, NULL);
+}
+
 // terminate all startup stuff.
 void termServer(void) {
 	// clientlist
