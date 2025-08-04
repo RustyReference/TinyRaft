@@ -630,7 +630,6 @@ void* clientCommandThread(void* clientThread) {
 	while( (len = threadMsgRecv(coms, &buf) >= 0) ) {
 		// just necessary for clientCommandThread only for some reason.
     send(thread->info.sockfd, buf, strlen(buf)+1, 0);
-		//send(thread->info.sockfd, buf, strnlen(buf, 1024)+1, 0);
 		free(buf);
 	}
 	thread->tlen--;
