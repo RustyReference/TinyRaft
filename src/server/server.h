@@ -34,6 +34,11 @@ struct ServListSafe {
 	pthread_mutex_t lock;
 };
 
+struct Index {
+	int ind;		
+	pthread_mutex_t lock;
+};
+
 // init all startup stuff and global variables . 
 void initServer(void);
 

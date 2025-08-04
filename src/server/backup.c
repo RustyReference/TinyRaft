@@ -21,6 +21,7 @@ int main(int argc, char* argv[]) {
 		.sin6_addr = IN6ADDR_ANY_INIT,
 		.sin6_scope_id = 0
 	};
+	
 	if(argc > 1) {
     // get rid of "bind address already in use "
     int optval = 1;
@@ -35,7 +36,8 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 	}
-	int status = connect(sockfd, (struct sockaddr*)&addr, sizeof(addr));
+
+	int status = connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));
 	if(status < 0) {
 		perror("connect");
 	}
