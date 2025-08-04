@@ -35,8 +35,6 @@ int main() {
 
 	// free the server and exit
 	ServThreadFree(&leaderThread);
-	sleep(1);
 	termServer();
-	sleep(1);
 	return 0;
 }

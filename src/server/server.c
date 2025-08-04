@@ -86,7 +86,8 @@ void clearId(int id) {
     pthread_mutex_unlock(&idpool.lock);
 }
 
-// Init a leader server.
+
+// Init and start listening for a leader server.
 // @dst : Store the socket and address in @dst
 // @port : Bind to port @port
 // #RETURN : 0 on error. 1 on success.
@@ -233,8 +234,8 @@ struct ServThread* procLeader(struct ServInfo info) {
         return NULL;
     }
 
-    leader = server;
-    return leader;
+	leader = server; // global loopback
+	return leader;
 }
 
 // free ServThread the pointer @server from memory
@@ -310,46 +311,16 @@ int strnsplit(char* str, int len, char delim, char* buf[]) {
     return i;
 }
 
-// TODO: DELETE AFTER DEMO
-//  write foo = goo to db.
-char fooList[255][25] = {0};
-char gooList[255][25] = {0};
-void dbwrite(char foo[], char goo[]) {
-    // select valid foo
-    int i = 0;
-    while (i < 255) {
-        if (strncmp(fooList[i], "", 1) == 0 || strncmp(fooList[i], foo, 25) == 0) {
-            break;
-        }
-        i++;
-    }
-    if (i > 255) {
-        return;
-    }
-    strncpy(fooList[i], foo, 25);
-    strncpy(gooList[i], goo, 25);
-}
-
-int dbRead(char foo[], char buf[]) {
-    for (int i = 0; i < 255; i++) {
-        if (strncmp(fooList[i], foo, 25) == 0) {
-            strncpy(buf, gooList[i], 25);
-            return 1;
-        }
-    }
-    return 0;
-}
-
 // execute a command for the leader
 // @cmd : Command
 // @cmdlen : maxsize of the command
 // #RETURN : negative on error, otherwise ID of the command.
 // 	-1 : invalid/error
-// 	0 : exit command
-// 	1 : backup-all
-// 	2 : client-all
-// TODO: decide if the leader node will ever need to echo messages to each follower without actually operating.
-// TODO: implement looking at second token of cmd to see if it is "write" or "delete"
+// 	0 : exit -> stop leader server
+// 	1 : backup-all -> say something to all backups at once
+// 	2 : client-all -> say something to all clients at once
+// 	3 : backup-address -> say something to a specific backup server ( work in progress )
+// 	4 : client-address -> say something to a specific client sever ( work in progress )
 int leaderCommandExec(char* cmd, int cmdlen) {
     // sanitize
     if (!cmd || cmdlen <= 0) {
@@ -384,32 +355,12 @@ int leaderCommandExec(char* cmd, int cmdlen) {
         return 1;
     }
 
-    // client-all
-    if (strncmp(buf[0], "client-all", firstlen) == 0) {
-        broadcastMsg(clientList, cmd, 0);
-        free(*buf);
-
-        return 2;
-    }
-
-    // TODO: DELETE AFTER DEMO
-    if (strncmp(buf[0], "write", firstlen) == 0) { // example: backup-all write x = 3
-        dbwrite(buf[1], buf[3]); // Pass in the key and value: (e.g. write key = value)
-        broadcastMsg(backupList, cmd, 0);
-        free(*buf);
-
-        return 5;
-    } else if (strncmp(buf[0], "read", firstlen) == 0) {
-        char dbuf[25] = {0};
-        if (dbRead(buf[1], dbuf)) {
-            broadcastMsg(clientList, dbuf, 0);
-        } else {
-            printf("%s\n", "No value found.");
-        }
-        free(*buf);
-
-        return 4;
-    }
+	// client-all
+	if(strncmp(buf[0], "client-all", firstlen) == 0) {
+		broadcastMsg(clientList, cmd, 0);
+		free(*buf);
+		return 2;
+	}
 
     // end of redirections.
     cmd -= firstlen;
@@ -566,19 +517,20 @@ void* backupCommandThread(void* backupThread) {
     int* oldtype = NULL;
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, oldtype);
 
-    // init
-    struct ServThread* thread = backupThread;
-    struct ThreadMsg* coms = thread->coms;
-    char* buf = NULL;
-    int len = 0;
-    while ((len = threadMsgRecv(coms, &buf) >= 0)) {
-        // just necessary for backupCommandThread only for some reason.
-        send(thread->info.sockfd, buf, strnlen(buf, 1024) + 1, 0);
-        free(buf);
-    }
-    thread->tlen--;
-    thread->tid[0] = thread->tid[1]; // ?
-    pthread_exit(NULL);
+	// init
+	struct ServThread* thread = backupThread;
+	struct ThreadMsg* coms = thread->coms;
+	char* buf = NULL;
+	int len = 0;
+	while( (len = threadMsgRecv(coms, &buf) >= 0) ) {
+		// just necessary for backupCommandThread only for some reason.
+    // SHIVESH : encrypt(buf, buflen);
+		send(thread->info.sockfd, buf, strnlen(buf, 1024)+1, 0); // echo directly to the backup server
+		free(buf);
+	}
+	thread->tlen--;
+  thread->tid[0] = thread->tid[1]; // ?
+	pthread_exit(NULL);
 }
 
 // Add servThread to servList.

@@ -6,16 +6,6 @@
 #include <pthread.h>
 #include <string.h>
 
-// TODO: DELETE AFTER DEMO
-void* printEverything(void* socket) {
-  int sockfd = *(int*)socket;
-  char buf[255];
-  while(read(sockfd, buf, 255) > 0) {
-    printf("%s\n", buf);
-  }
-  pthread_exit(NULL);
-}
-
 int main() {
 	int sockfd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(sockfd < 0) {
