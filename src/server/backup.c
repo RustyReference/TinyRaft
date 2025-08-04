@@ -20,10 +20,12 @@ int main(int argc, char* argv[]) {
 		.sin6_addr = IN6ADDR_ANY_INIT,
 		.sin6_scope_id = 0
 	};
+	
 	if(argc > 1) {
 		inet_pton(AF_INET6, argv[1], &addr);
 	}
-	int status = connect(sockfd, (struct sockaddr*)&addr, sizeof(addr));
+
+	int status = connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));
 	if(status < 0) {
 		perror("connect");
 	}
