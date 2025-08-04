@@ -11,6 +11,7 @@ int main(int argc, char* argv[]) {
 	int sockfd = socket(AF_INET6, SOCK_STREAM, 0);
 	if(sockfd < 0) {
 		perror("sockfd");
+    return 1;
 	}
 
 	struct sockaddr_in6 addr = {
@@ -21,7 +22,18 @@ int main(int argc, char* argv[]) {
 		.sin6_scope_id = 0
 	};
 	if(argc > 1) {
+    // get rid of "bind address already in use "
+    int optval = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+    // bind
 		inet_pton(AF_INET6, argv[1], &addr);
+    if(bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+      // error
+      perror("bind\n");
+      close(sockfd);
+      return 1;
+    }
 	}
 	int status = connect(sockfd, (struct sockaddr*)&addr, sizeof(addr));
 	if(status < 0) {

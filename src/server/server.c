@@ -89,7 +89,7 @@ void clearId(int id) {
 }
 
 
-// Init a leader server.
+// Init and start listening for a leader server.
 // @dst : Store the socket and address in @dst
 // @port : Bind to port @port
 // #RETURN : 0 on error. 1 on success.
@@ -237,7 +237,7 @@ struct ServThread* procLeader(struct ServInfo info) {
 		return NULL;
 	}
 
-	leader = server;
+	leader = server; // global loopback
 	return leader;
 }
 
@@ -314,43 +314,16 @@ int strnsplit(char* str, int len, char delim, char* buf[]) {
 	return i;
 }
 
-//TODO: DELETE AFTER DEMO
-// write foo = goo to db.
-char fooList[255][25] = { 0 };
-char gooList[255][25] = { 0 };
-void dbwrite(char foo[], char goo[]) {
-  // select valid foo
-  int i = 0;
-  while(i < 255) {
-    if(strncmp(fooList[i], "", 1) == 0 || strncmp(fooList[i], foo, 25) == 0) {
-      break;
-    }
-    i++;
-  }
-  if(i > 255) {
-    return;
-  }
-  strncpy(fooList[i], foo, 25);
-  strncpy(gooList[i], goo, 25);
-}
-int dbRead(char foo[], char buf[]) {
-  for(int i = 0; i < 255; i++) {
-    if(strncmp(fooList[i], foo, 25) == 0) {
-      strncpy(buf, gooList[i], 25);
-      return 1;
-    }
-  }
-  return 0;
-}
-
 // execute a command for the leader
 // @cmd : Command
 // @cmdlen : maxsize of the command
 // #RETURN : negative on error, otherwise ID of the command.
 // 	-1 : invalid/error
-// 	0 : exit command
-// 	1 : backup-all
-// 	2 : 
+// 	0 : exit -> stop leader server
+// 	1 : backup-all -> say something to all backups at once
+// 	2 : client-all -> say something to all clients at once
+// 	3 : backup-address -> say something to a specific backup server ( work in progress )
+// 	4 : client-address -> say something to a specific client sever ( work in progress )
 int leaderCommandExec(char* cmd, int cmdlen) {
 	// sanitize
 	if(!cmd || cmdlen <= 0) {
@@ -389,23 +362,6 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 		free(*buf);
 		return 2;
 	}
-
-  //TODO: DELETE AFTER DEMO
-  if(strncmp(buf[0], "write", firstlen) == 0) {
-    dbwrite(buf[1], buf[3]);
-		broadcastMsg(backupList, cmd, 0);
-    free(*buf);
-    return 5;
-  } else if(strncmp(buf[0], "read", firstlen) == 0) {
-    char dbuf[25] = { 0 };
-    if(dbRead(buf[1], dbuf)) {
-		  broadcastMsg(clientList, dbuf, 0);
-    } else {
-      printf("%s\n", "No value found.");
-    }
-    free(*buf);
-    return 4;
-  }
 
 	// end of redirections.
 	cmd -= firstlen;
@@ -572,7 +528,8 @@ void* backupCommandThread(void* backupThread) {
 	int len = 0;
 	while( (len = threadMsgRecv(coms, &buf) >= 0) ) {
 		// just necessary for backupCommandThread only for some reason.
-		send(thread->info.sockfd, buf, strnlen(buf, 1024)+1, 0);
+    // SHIVESH : encrypt(buf, buflen);
+		send(thread->info.sockfd, buf, strnlen(buf, 1024)+1, 0); // echo directly to the backup server
 		free(buf);
 	}
 	thread->tlen--;
