@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "server.h"
-#include <wait.h>
+#include <sys/wait.h>
 #include <arpa/inet.h>
 
 int main() {
@@ -20,6 +20,7 @@ int main() {
 		termServer();
 		return 0;
 	}
+	
 	char ipAddr[255];
 	inet_ntop(AF_INET6, &leaderServer.addr, ipAddr, 255);
 	printf("starting leader server at %s\n", ipAddr);

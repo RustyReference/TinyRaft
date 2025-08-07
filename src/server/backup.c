@@ -7,6 +7,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+/**
+ * Starts the initial leader node
+ * 
+ * @param argc the number of command line args
+ * @param argv [1]: the port to bind to
+ * @return 1 if there is an error
+ */
 int main(int argc, char* argv[]) {
     int sockfd = socket(AF_INET6, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -29,6 +36,8 @@ int main(int argc, char* argv[]) {
         setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
         // bind
         inet_pton(AF_INET6, argv[1], &addr);
+
+		// Bind to any listening ip address with the same port and info.
         if (bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
             // error
             perror("bind\n");
@@ -41,7 +50,7 @@ int main(int argc, char* argv[]) {
     if (status < 0) {
         perror("connect");
     }
-    send(sockfd, "backup", sizeof "backup", 0);
+    send(sockfd, "backup", sizeof "backup", 0); // Send "backup" to identify this node as backup
 
     char buf[255] = {0};
     int len = 0;

@@ -110,7 +110,7 @@ int threadMsgSend(struct ThreadMsg* coms, char* msg, int len) {
 		return 0;
 	} 
 	if(len <= 0) {
-		len = strnlen(msg, 1024)+1;
+		len = strnlen(msg, 1024) + 1;
 	}
 	
 	// lock
@@ -135,8 +135,7 @@ const struct timespec ts = {
 // Safely get message from a ThreadMsg
 // @coms : Will use messagequeue from here.
 // @buf : Will store message here. Does NOT copy.
-// #RETURN 
-// 	How many bytes buf is.
+// #RETURN How many bytes buf is.
 int threadMsgRecv(struct ThreadMsg* coms, char** buf) {
 	// sanitize
 	if(!coms || !buf) {
