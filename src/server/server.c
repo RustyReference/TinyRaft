@@ -19,8 +19,13 @@ struct {
 struct ServListSafe clientList, backupList;
 struct ServThread* leader = NULL;
 
+// global index
+struct Index indexer;
+
 // init all startup stuff and global variables. 
 void initServer(void) {
+	indexer.ind = 0;
+    	pthread_mutex_init(&indexer.lock, NULL);
 	// server list
 	SLIST_INIT(&clientList.servers);
 	pthread_mutex_init(&clientList.lock, NULL);
@@ -34,11 +39,12 @@ void initServer(void) {
 
 /**
  * Initializes the global command indexing variable
- */
+ *
 void initIndex() {
 	indexer.ind = 0;
     pthread_mutex_init(&indexer.lock, NULL);
 }
+*/
 
 // terminate all startup stuff.
 void termServer(void) {
@@ -62,7 +68,9 @@ void termServer(void) {
 		free(np);
 		np = temp;
 	}
-
+	// indexer
+	//free(indexer.ind)
+	pthread_mutex_destroy(&indexer.lock);
 	pthread_mutex_destroy(&backupList.lock);
 	pthread_mutex_unlock(&backupList.lock);
 
