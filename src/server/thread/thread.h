@@ -23,6 +23,16 @@ int getId();
 // free @id back to the pool.
 void clearId(int id);
 
+/**
+ * Struct to store data about a log entry
+ */
+struct LogEntry {
+	int index;
+	int term;
+	char *command;
+	int cmdlen;
+};
+
 // Pass message between threads with this.
 struct QueueEntry {
 	STAILQ_ENTRY(QueueEntry) messages;
@@ -62,14 +72,14 @@ void MsgQueueFree(struct MsgQueue** _Nullable mqueue);
 // @msg : Buffer to copy. Set NULL for empty.
 // @len : maxlen. Set 0 or less for default 1024.
 // #RETURN : 0 on malloc error. 1 on success.
-int MsgQueuePush(struct MsgQueue* mqueue, char* msg, int len);
+int MsgQueuePush(struct MsgQueue* mqueue, struct LogEntry entryInfo, int len);
 
 // Send message to a server thread.
 // @coms : Appends message to commands in @coms.
 // @msg : What to append.
 // @len : Lenght of the command. <= 0 means @len = strnlen(msg, 1024);
 // 	Will lock the thread and send notification. Return 0 on error.
-int threadMsgSend(struct ThreadMsg* coms, char* msg, int len);
+int threadMsgSend(struct ThreadMsg* coms, struct LogEntry entry, int len);
 
 // Safely get message from a ThreadMsg
 // @coms : Will use messagequeue from here.

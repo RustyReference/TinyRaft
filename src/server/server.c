@@ -13,7 +13,7 @@
 struct {
     int ids[MAXID];
     pthread_mutex_t lock;
-} idpool = {0};
+} idpool = { 0 };
 
 // list of servers
 struct ServListSafe clientList, backupList;
@@ -37,7 +37,17 @@ void initServer(void) {
  */
 void initIndex() {
     indexer.ind = 0;
+    indexer.term = 0;
     pthread_mutex_init(&indexer.lock, NULL);
+}
+
+/**
+ * Increments the global indexer
+ */
+void incIndex() {
+    pthread_mutex_lock(&indexer.lock);
+    indexer.ind++;
+    pthread_mutex_unlock(&indexer.lock);
 }
 
 // terminate all startup stuff.
@@ -126,7 +136,8 @@ int getLeader(struct ServInfo *dst, int port) {
         .sin6_port = htons(port),
         .sin6_flowinfo = 0,
         .sin6_addr = IN6ADDR_ANY_INIT,
-        .sin6_scope_id = 0};
+        .sin6_scope_id = 0
+    };
     dst->addrlen = sizeof(dst->addr);
 
     // bind address to socket sockfd
@@ -212,7 +223,8 @@ struct ServThread *procLeader(struct ServInfo info) {
         .coms = coms,
         .tid = (pthread_t *)calloc(2, sizeof(pthread_t)),
         .tlen = 2, // 1 for commands and 1 more for good measure
-        .id = id};
+        .id = id
+    };
 
     // start the threads
     if (!server->tid) {
@@ -354,17 +366,17 @@ int leaderCommandExec(char *cmd, int cmdlen) {
         return 0;
     }
 
+    // TODO(1): Somehow send the log entry object instead of a string to the backup.
+    struct LogEntry entry = {
+        .index = indexer.ind,
+        .term = indexer.term,
+        .command = cmd,
+        .cmdlen = cmdlen
+    };
+
     // backup-all
     if (strncmp(buf[0], "backup-all", firstlen) == 0) {
-        // TODO: Somehow send the log entry object instead of a string to the backup.
-        struct LogEntry entry = {
-            .index = 0,
-            .term = 0,
-            .command = cmd,
-            .cmdlen = cmdlen
-        };
-
-        broadcastMsg(backupList, cmd, 0);
+        broadcastMsg(backupList, entry, 0);               // TODO(1): Send cmd as LogEntry
         leaderCommandExec(cmd, strnlen(cmd, cmdlen) + 1); // recursion at its finest!
         free(*buf);
         return 1;
@@ -372,7 +384,7 @@ int leaderCommandExec(char *cmd, int cmdlen) {
 
     // client-all
     if (strncmp(buf[0], "client-all", firstlen) == 0) {
-        broadcastMsg(clientList, cmd, 0);
+        broadcastMsg(clientList, entry, 0);
         free(*buf);
         return 2;
     }
@@ -389,11 +401,10 @@ int leaderCommandExec(char *cmd, int cmdlen) {
 // @server : list of servers
 // @msg : what to say
 // @maxlen : size of the message, set <= 0 for strnlen
-void broadcastMsg(struct ServListSafe serverlist, char *msg, int maxlen) {
-    // sanitize
-    if (!msg) {
-        return;
-    }
+void broadcastMsg(struct ServListSafe serverlist, struct LogEntry entry, int maxlen) {
+    // TODO:    'msg' appears to be what needs to be replaced
+    //          by the LogEntry object
+
     if (maxlen < 0) {
         maxlen = 0;
     }
@@ -403,7 +414,7 @@ void broadcastMsg(struct ServListSafe serverlist, char *msg, int maxlen) {
     struct ServListEntry *current;
     // whoever made SLIST has my respect for this syntax
     SLIST_FOREACH(current, &serverlist.servers, servers) {
-        threadMsgSend(current->server->coms, msg, 0);
+        threadMsgSend(current->server->coms, entry, 0);
     }
     // end
     pthread_mutex_unlock(&serverlist.lock);
@@ -420,17 +431,17 @@ void *leaderAcceptThread(void *leaderServer) {
 
     // init bufs
     socklen_t addrlen = 0;
-    struct sockaddr_in6 addr = {0};
+    struct sockaddr_in6 addr = { 0 };
     int sockfd;
 
     // For each new connection.
     while ((sockfd = accept(server->info.sockfd, (struct sockaddr *)&addr, &addrlen)) > 0) {
         // Gather the information
         struct ServInfo *info = malloc(sizeof(struct ServInfo));
-        *info = (struct ServInfo) {
+        *info = (struct ServInfo){
             .sockfd = sockfd,
             .addr = addr,
-            .addrlen = addrlen 
+            .addrlen = addrlen
         };
 
         // Start a new thread with it.
@@ -504,7 +515,8 @@ void backupRecv(struct ServThread *backupThread) {
     int sockfd = backupThread->info.sockfd;
     const struct timeval tv = {
         .tv_sec = 0,
-        .tv_usec = 0};
+        .tv_usec = 0
+    };
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     // start recieving requests
@@ -595,7 +607,8 @@ void clientRecv(struct ServThread *clientThread) {
     int sockfd = clientThread->info.sockfd;
     const struct timeval tv = {
         .tv_sec = 0,
-        .tv_usec = 0};
+        .tv_usec = 0
+    };
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     // start recieving requests

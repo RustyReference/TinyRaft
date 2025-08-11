@@ -34,15 +34,9 @@ struct ServListSafe {
 	pthread_mutex_t lock;
 };
 
-struct LogEntry {
-	int index;
-	int term;
-	char *command;
-	int cmdlen;
-};
-
-struct Index {
-	int ind;		
+struct IndexTerm {
+	int ind;
+	int term;	
 	pthread_mutex_t lock;
 } indexer;
 

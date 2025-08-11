@@ -1,3 +1,4 @@
+#include "../server/thread/thread.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/queue.h>
@@ -27,7 +28,7 @@ void removeAfter(struct List *list, char *str) {
     struct Node *prev = NULL;
 
     SLIST_FOREACH(curr, list, entries) {
-        if (!strncmp(curr->str, str, 255) == 0) {
+        if (!(strncmp(curr->str, str, 255) == 0)) {
             continue;
         }
 
@@ -49,12 +50,23 @@ void deleteList(struct List *list) {
     }
 }
 
-int main() {
-    // Declaring and initializing the head of the list
-    struct List head;
-    SLIST_INIT(&head);
+#define BUF_LIM 256
+void serializeEntry(struct LogEntry entryInfo, char buff[BUF_LIM]) {
+    snprintf(buff, BUF_LIM, "%d %d %s %d",
+             entryInfo.index,
+             entryInfo.term,
+             entryInfo.command,
+             entryInfo.cmdlen);
+}
 
-    // Adding the first few nodes
+int main() {
+    struct LogEntry entry = {
+        1, 1, "test", 4
+    };
+
+    char s[BUF_LIM];
+    serializeEntry(entry, s);
+    printf("Serialized: %s", s);
 
     return 0;
 }
