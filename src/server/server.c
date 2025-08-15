@@ -38,6 +38,7 @@ void initServer(void) {
 /**
  * Initializes the global command indexing variable
  */
+struct Index indexer;
 void initIndex() {
     indexer.ind = 0;
     indexer.term = 0;
