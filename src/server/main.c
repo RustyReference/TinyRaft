@@ -6,7 +6,7 @@
 
 int main() {
 	initServer();
-
+	db_init();
 	// get a server
 	struct ServInfo leaderServer;
 	if(!getLeader(&leaderServer, 9600)) {

@@ -4,7 +4,6 @@
 #include "server.h"
 #include <sys/time.h>
 #include <arpa/inet.h>
-
 #ifndef MAXID 
 #define MAXID 16
 #endif
@@ -330,6 +329,46 @@ int strnsplit(char* str, int len, char delim, char* buf[]) {
 	return i;
 }
 
+/** Parse and execute command from a sent message
+ * @msg : The message sent from a server thread
+ * @msglen : Length of the message
+ * #RETURN : -1 on failure and 0 on success
+ */
+
+int parseAndExecute(char* msg, int msglen) {
+	printf("Parsing command: %s\n", msg);
+
+	char* buf[255];
+	int numParts = strnsplit(msg, msglen, ' ', buf);
+	
+	if(numParts<=0) {
+		printf("ERROR: Failed to parse command\n");
+		return -1;
+	}
+	printf("Message has %d parts\n", numParts);
+	// Get the cmd type from first word
+	char* cmdtype = buf[0];
+	if(strncmp(cmdtype, "write", 5)==0) {
+		printf("WRITING to database\n");
+		char* key = buf[1];
+		char* val = buf[3];
+		put(key, val);
+	}
+	else if(strncmp(cmdtype, "read", 5)==0) {
+		printf("READING data from %d\n", cmdtype[1]);
+	}
+
+	for(int i = 0; i<numParts; i++) {
+		printf("buf[%d] = %s\n", i, buf[i]);
+
+	}
+
+	free(*buf);
+	return 0; // Successfully parsed
+}
+
+
+
 // execute a command for the leader
 // @cmd : Command
 // @cmdlen : maxsize of the command
@@ -357,7 +396,21 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 
 	// redirections
 	cmd += firstlen;
+	
+	if(strncmp(buf[0], "write", 5)==0 ||
+	   strncmp(buf[0], "read", 4)==0 ||	
+	   strncmp(buf[0], "delete", 6)==0) {
 
+		// directly parse and execute command
+		cmd -= firstlen;
+		int res = parseAndExecute(cmd, cmdlen);
+		if(res<=0) {
+			printf("ERROR Failed to parse command");
+			return -1;
+		}
+		free(*buf);
+		return 3;
+	}
 	// exit
 	if(strncmp(buf[0], "exit", firstlen) == 0) {
 		free(*buf);
@@ -515,7 +568,16 @@ void backupRecv(struct ServThread* backupThread) {
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	while(recv(sockfd, buf, 1024, 0) > 0) {
 		*strchrnul(buf, '\n') = '\0';
-		// TODO: backupCommandExec
+		printf("BACKUP: Received command: %s\n", buf);
+
+		// Parse and execute the command
+		int result = parseAndExecute(buf, strlen(buf));
+		if(result==-1) {
+			printf("ERROR parsing and executing");
+		}
+		else{
+			printf("COMMAND parsed and executed");
+		}
 	}
 
 	// Remove from list and exit

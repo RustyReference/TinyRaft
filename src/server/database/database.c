@@ -80,6 +80,7 @@ void put(const char* key, const char* value) {
             		free(head->value);
             		head->value = strdup(value);
             		save_to_file();  // Update file
+			printf("save_to_file() returned:");
             		pthread_mutex_unlock(&db_mutex);  
             		printf("Updated: %s = %s\n", key, value);
             		return;
@@ -193,7 +194,8 @@ void print() {
 
 // Save hash table to file - format: hash_index key value
 int save_to_file() {
-    	FILE* file = fopen(DB_FILENAME, "w");
+
+	FILE* file = fopen(DB_FILENAME, "a");
     	if (!file) {
         	printf("Error: Cannot open file for writing: %s\n", strerror(errno));
         	return -1;
@@ -206,14 +208,15 @@ int save_to_file() {
             		head = head->next;
         	}
     	}
-    
+   	 
     	fclose(file);
+
     	return 0;
 }
 
 // Load hash table from file
 int load_from_file() {
-    	FILE* file = fopen(DB_FILENAME, "r");
+    	FILE* file = fopen(DB_FILENAME, "a");
     	if (!file) {
         	printf("No existing database file found, starting fresh\n");
         	return 0;  // Not an error, just means no previous data
@@ -232,6 +235,11 @@ int load_from_file() {
         	char* value = strtok(NULL, " ");*/
         	char* buf[255];
 		int len = strnsplit(line, 1024, ' ', buf);
+		if(len <= 0) {
+			printf("ERROR failed to parse command\n");
+			return -1;
+		}
+
 		char* key = buf[1]; // Key is second string in the line
 		char* value = buf[2]; // Value is third string in the line
         	if (key && value) {

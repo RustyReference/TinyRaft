@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <sys/queue.h>
 #include "thread/thread.h"
-
+#include "database/database.h"
 // Hold information about a server.
 struct ServInfo {
 	int sockfd;
