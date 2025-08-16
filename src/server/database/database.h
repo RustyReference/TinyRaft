@@ -5,7 +5,7 @@
 
 #define TABLE_SIZE 100
 #define MAX_LINE_SIZE 1024
-#define DB_FILENAME "db.txt"
+#define DB_FILENAME "database/db.txt"
 
 typedef struct entry {
     char* key;

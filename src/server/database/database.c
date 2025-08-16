@@ -195,7 +195,7 @@ void print() {
 // Save hash table to file - format: hash_index key value
 int save_to_file() {
 
-	FILE* file = fopen(DB_FILENAME, "a");
+	FILE* file = fopen(DB_FILENAME, "w");
     	if (!file) {
         	printf("Error: Cannot open file for writing: %s\n", strerror(errno));
         	return -1;
@@ -216,7 +216,7 @@ int save_to_file() {
 
 // Load hash table from file
 int load_from_file() {
-    	FILE* file = fopen(DB_FILENAME, "a");
+    	FILE* file = fopen(DB_FILENAME, "r");
     	if (!file) {
         	printf("No existing database file found, starting fresh\n");
         	return 0;  // Not an error, just means no previous data
