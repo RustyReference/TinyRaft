@@ -355,7 +355,17 @@ int parseAndExecute(char* msg, int msglen) {
 		put(key, val);
 	}
 	else if(strncmp(cmdtype, "read", 5)==0) {
-		printf("READING data from %d\n", cmdtype[1]);
+		printf("READING data from %s\n", buf[1]);
+		char* data = get(buf[1]); // Get data from key (second string in input)
+		printf("%s : %s\n", buf[1], data);
+	}
+	else if(strncmp(cmdtype, "delete", 6)==0) {
+		printf("DELETING data for %s\n", buf[1]);
+		delete_entry(buf[1]); // Delete data for the key
+	}
+	else if(strncmp(cmdtype, "print", 5)==0) {
+		printf("PRINTING database contents\n");
+		print();
 	}
 
 	for(int i = 0; i<numParts; i++) {
@@ -399,7 +409,8 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 	
 	if(strncmp(buf[0], "write", 5)==0 ||
 	   strncmp(buf[0], "read", 4)==0 ||	
-	   strncmp(buf[0], "delete", 6)==0) {
+	   strncmp(buf[0], "delete", 6)==0 ||
+       	   strncmp(buf[0], "print", 5)==0)	{
 
 		// directly parse and execute command
 		cmd -= firstlen;
@@ -420,7 +431,12 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 	// backup-all
 	if(strncmp(buf[0], "backup-all", firstlen) == 0) {
 		broadcastMsg(backupList, cmd, 0);
-		leaderCommandExec(cmd, strnlen(cmd, cmdlen)+1); // recursion at its finest!
+		//leaderCommandExec(cmd, strnlen(cmd, cmdlen)+1); // recursion at its finest!
+		int res = parseAndExecute(cmd, cmdlen);
+		if(res <= 0) {
+			printf("ERROR Failure parsing command");
+			return -1;
+		}
 		free(*buf);
 		return 1;
 	}
@@ -564,14 +580,18 @@ void backupRecv(struct ServThread* backupThread) {
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
 	// start recieving requests
-	char buf[1024];
+	char* buf[1024];
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	while(recv(sockfd, buf, 1024, 0) > 0) {
-		*strchrnul(buf, '\n') = '\0';
-		printf("BACKUP: Received command: %s\n", buf);
+		*strchrnul(buf[0], '\n') = '\0';
+		printf("BACKUP: Received command: %s\n", buf[0]);
+		int firstlen = strnlen(buf[0], strlen(buf[0]))+1;
 
+		// redirections
+		buf[0] += firstlen;
+		
 		// Parse and execute the command
-		int result = parseAndExecute(buf, strlen(buf));
+		int result = parseAndExecute(buf[0], strlen(buf[0]));
 		if(result==-1) {
 			printf("ERROR parsing and executing");
 		}

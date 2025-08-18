@@ -183,7 +183,7 @@ void print() {
                 		head = head->next;
                 		total_entries++;
             		}
-            		printf("NULL\n");
+            		printf("\n");
         	}
     	}
     
