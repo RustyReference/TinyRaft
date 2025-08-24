@@ -109,7 +109,7 @@ void* handleBackupRecv() {
   // while recieving communications
   char buf[1024];
   int len = 0;
-  while((len = recv(leaderInfo.sockfd, buf, 1024, 0)) > 0) {
+  while ((len = recv(leaderInfo.sockfd, buf, 1024, 0)) > 0) {
     // send them to backupExec
     if(!backupExec(buf, len)) {
       break;
