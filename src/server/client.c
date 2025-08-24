@@ -95,7 +95,7 @@ int connectLeader(char address[], char port[]) {
   }
 
   // return the socket if success. print beforehand tho
-  leaderInfo.addr = *addr->ai_addr;
+  leaderInfo.addr = *(struct sockaddr_storage*)addr->ai_addr;
   leaderInfo.addrlen = addr->ai_addrlen;
   leaderInfo.sockfd = sockfd;
   return sockfd;
