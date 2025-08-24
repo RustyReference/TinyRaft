@@ -1,0 +1,50 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-o",
+      "main",
+      "main.c"
+    ],
+    "directory": "/home/jan/projects/TinyRaft/src/server",
+    "file": "/home/jan/projects/TinyRaft/src/server/main.c",
+    "output": "/home/jan/projects/TinyRaft/src/server/main"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-o",
+      "main",
+      "thread/thread.c"
+    ],
+    "directory": "/home/jan/projects/TinyRaft/src/server",
+    "file": "/home/jan/projects/TinyRaft/src/server/thread/thread.c",
+    "output": "/home/jan/projects/TinyRaft/src/server/main"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-o",
+      "main",
+      "server.c"
+    ],
+    "directory": "/home/jan/projects/TinyRaft/src/server",
+    "file": "/home/jan/projects/TinyRaft/src/server/server.c",
+    "output": "/home/jan/projects/TinyRaft/src/server/main"
+  }
+]
