@@ -1,40 +1,40 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 int main() {
-	int sockfd = socket(AF_INET6, SOCK_STREAM, 0);
-	if(sockfd < 0) {
-		perror("sockfd");
-	}
+    int sockfd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        perror("sockfd");
+    }
 
-	struct sockaddr_in6 addr = {
-		.sin6_family = AF_INET6,
-		.sin6_port = htons(9600),
-		.sin6_flowinfo = 0,
-		.sin6_addr = IN6ADDR_ANY_INIT,
-		.sin6_scope_id = 0
-	};
-	int status = connect(sockfd, (struct sockaddr*)&addr, sizeof(addr));
-	if(status < 0) {
-		perror("connect");
-	}
-	send(sockfd, "client", sizeof "client", 0);
-  pthread_t tid;
-  pthread_create(&tid, NULL, printEverything, &sockfd);
+    struct sockaddr_in6 addr = {
+        .sin6_family = AF_INET6,
+        .sin6_port = htons(9600),
+        .sin6_flowinfo = 0,
+        .sin6_addr = IN6ADDR_ANY_INIT,
+        .sin6_scope_id = 0
+    };
+    int status = connect(sockfd, (struct sockaddr *)&addr, sizeof(addr));
+    if (status < 0) {
+        perror("connect");
+    }
+    send(sockfd, "client", sizeof "client", 0);
+    pthread_t tid;
+    pthread_create(&tid, NULL, printEverything, &sockfd);
 
-	char buf[255];
-	while(fgets(buf, 255, stdin)) {
-		*strchrnul(buf, '\n') = '\0';
-		if(send(sockfd, buf, 255, 0) < 0) {
-			break;
-		}
-	}
-  pthread_cancel(tid);
-  pthread_join(tid, NULL);
-	return 0;
+    char buf[255];
+    while (fgets(buf, 255, stdin)) {
+        *strchrnul(buf, '\n') = '\0';
+        if (send(sockfd, buf, 255, 0) < 0) {
+            break;
+        }
+    }
+    pthread_cancel(tid);
+    pthread_join(tid, NULL);
+    return 0;
 }
