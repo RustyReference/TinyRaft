@@ -9,7 +9,7 @@
 // Hold information about a server.
 struct ServInfo {
   int sockfd;            // socket
-  struct sockaddr addr; // address
+  struct sockaddr_storage addr; // address
   socklen_t addrlen;     // how many bytes address is
 };
 

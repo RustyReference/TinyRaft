@@ -166,7 +166,7 @@ int getLeader(struct ServInfo *dst, char *port) {
     addr = addr->ai_next;
   }
   dst->addrlen = addr->ai_addrlen;
-  dst->addr = *addr->ai_addr;
+  dst->addr = *(struct sockaddr_storage*)addr->ai_addr;
   freeaddrinfo(addr);
 
   // address error
@@ -512,7 +512,7 @@ void *leaderAcceptThread(void *leaderServer) {
     struct ServInfo *info = malloc(sizeof(struct ServInfo));
     info->sockfd = sockfd;
     info->addrlen = sizeof addr;
-    info->addr = addr;
+    info->addr = *(struct sockaddr_storage*)&addr;
 
     // Start a new thread with it.
     pthread_t tid;
@@ -748,7 +748,7 @@ void printServList(struct ServListSafe servList) {
     // get id
     id = current->server->id;
     // get address
-    addr = current->server->info.addr;
+    addr = *(struct sockaddr*)&(current->server->info.addr);
     addrlen = current->server->info.addrlen;
     // print info
     if (getnameinfo(&addr, addrlen, hbuf, NI_MAXHOST, NULL, 0,
