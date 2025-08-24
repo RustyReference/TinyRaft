@@ -3,7 +3,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
-#include <wait.h>
+#include <sys/wait.h>
 
 void printBackups();
 

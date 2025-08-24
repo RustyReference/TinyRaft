@@ -26,6 +26,7 @@ int backupExec(char* cmd, int cmdlen);
 
 // connect to a leader and process it until it ultimately falls.
 int main(int, char *argv[]) {
+  initServer();
   // connect to the leader
   int sockfd = connectLeader(argv[1], argv[2]);
   if (sockfd < 0) {
@@ -157,5 +158,6 @@ int backupExec(char* cmd, int cmdlen) {
   // print otherwise
   printf("%s\n", combinedArgs);
   free(*buf);
+  termServer();
   return -1;
 }
