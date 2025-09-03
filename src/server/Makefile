@@ -1,4 +1,4 @@
-CC = gcc -g -Wall -Wextra
+CC = gcc -g -w
 
 run: compile
 	./main

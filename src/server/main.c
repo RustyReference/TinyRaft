@@ -31,7 +31,11 @@ int main() {
 
   char buf[255];
   while (fgets(buf, 255, stdin)) {
-    *strchrnul(buf, '\n') = '\0';
+    //*strchrnul(buf, '\n') = '\0';
+    char* end = strrchr(buf, '\n');
+    if(end) {
+      *end = '\0';
+    }
     if (strncmp(buf, "exit", 255) == 0) {
       break;
     }

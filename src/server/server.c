@@ -1,6 +1,5 @@
 #ifndef LEADER_H
 #define LEADER_H
-#define _GNU_SOURCE
 
 #include "server.h"
 #include <arpa/inet.h>
@@ -351,7 +350,7 @@ int strnsplit(char *str, int len, char delim, char *buf[]) {
 
   // go around seperating stuff.
   int i;
-  for (i = 1; *(cpy = strchrnul(cpy, delim)); i++) {
+  for (i = 1; (cpy = strrchr(cpy, delim)); i++) {
     // skip through delims
     while (*cpy == delim) {
       *cpy = '\0';
@@ -594,7 +593,9 @@ void backupRecv(struct ServThread *backupThread) {
   char buf[1024];
   setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   while (recv(sockfd, buf, 1024, 0) > 0) {
-    *strchrnul(buf, '\n') = '\0';
+    //*strchrnul(buf, '\n') = '\0';
+    char* end = strrchr(buf, '\n');
+    if(end) {*end = '\0'; }
     printf("backup says %s\n", buf);
     // TODO: backupCommandExec
   }
@@ -694,7 +695,9 @@ void clientRecv(struct ServThread *clientThread) {
   char buf[1024];
   setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   while (recv(sockfd, buf, 1024, 0) > 0) {
-    *strchrnul(buf, '\n') = '\0';
+    //*strchrnul(buf, '\n') = '\0';
+    char* end = strrchr(buf, '\n');
+    if(end) {*end = '\0'; }
     // TODO: clientCommandExec
     // printf("client at %s says %s\n", "address", buf);
     threadMsgSend(leader->coms, buf, 0);
@@ -828,7 +831,7 @@ int clientCommandExec(struct ServThread *clientThread, char *cmd, int cmdlen) {
 // 	-1 : invalid/error
 // 	0 : exit command
 // 	1 : valid
-int backupCommandExec([[maybe_unused]] struct ServThread *backupThread,
+int backupCommandExec( struct ServThread *backupThread,
                       char *cmd, int cmdlen) {
   // sanitize
   if (!cmd || cmdlen < 0) {
