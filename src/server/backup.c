@@ -25,7 +25,7 @@ void* handleBackupRecv();
 int backupExec(char* cmd, int cmdlen);
 
 // connect to a leader and process it until it ultimately falls.
-int main(int, char *argv[]) {
+int main(int argc, char *argv[]) {
   initServer();
   // connect to the leader
   int sockfd = connectLeader(argv[1], argv[2]);
