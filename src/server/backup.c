@@ -88,15 +88,18 @@ int connectLeader(char address[], char port[]) {
   }
 
   // check for error
-  freeaddrinfo(addrlist);
   if (addr == NULL) {
     return 1;
   }
 
   // return the socket if success. print beforehand tho
-  leaderInfo.addr = *(struct sockaddr_storage*)addr->ai_addr;
+  //leaderInfo.addr = *(struct sockaddr_storage*)addr->ai_addr;
+  memcpy(&leaderInfo.addr, addr->ai_addr, sizeof leaderInfo.addr);
+  //leaderInfo.addr = (struct sockaddr_storage) {0};
   leaderInfo.addrlen = addr->ai_addrlen;
   leaderInfo.sockfd = sockfd;
+  freeaddrinfo(addrlist);
+
   return sockfd;
 }
 
