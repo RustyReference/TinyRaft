@@ -8,36 +8,38 @@
 
 // Hold information about a server.
 struct ServInfo {
-  int sockfd;            // socket
-  struct sockaddr_storage addr; // address
-  socklen_t addrlen;     // how many bytes address is
+	int sockfd;					  // socket
+	struct sockaddr_storage addr; // address
+	socklen_t addrlen;			  // how many bytes address is
 };
 
 // Use to manage servers as threads.
 struct ServThread {
-  struct ServInfo info;   // socket and address. Don't change it.
-  struct ThreadMsg *coms; // commands
-  pthread_t *tid;         // thread ids
-  int tlen;               // thread amount.
-  int id;                 // unique id of the server.
+	struct ServInfo info;	// socket and address. Don't change it.
+	struct ThreadMsg *coms; // commands
+	pthread_t *tid;			// thread ids
+	int tlen;				// thread amount.
+	int id;					// unique id of the server.
 };
 void ServThreadFree(struct ServThread **server); // free a ServThread* server.
 
 // list of servers with mutex
 struct ServListEntry {
-  struct ServThread *server;
-  SLIST_ENTRY(ServListEntry) servers;
+	struct ServThread *server;
+	SLIST_ENTRY(ServListEntry)
+	servers;
 };
 SLIST_HEAD(ServList, ServListEntry);
 
 struct ServListSafe {
-  struct ServList servers;
-  pthread_mutex_t lock;
+	struct ServList servers;
+	pthread_mutex_t lock;
 };
 
 struct Index {
-  int ind;
-  pthread_mutex_t lock;
+	int ind;
+	int term;
+	pthread_mutex_t lock;
 };
 
 // init all startup stuff and global variables .
@@ -131,7 +133,7 @@ void *backupCommandThread(void *backupThread);
 // anymore. 	DO NOT FREE SERVTHREAD AFTER ITS BEEN ADDED WITHOUT REMOVING
 // FIRST.
 struct ServListEntry *addServListSafe(struct ServListSafe *servList,
-                                      struct ServThread *servThread);
+									  struct ServThread *servThread);
 
 // Recieve communications from a command to process clientThread.
 // Will automatically free clientThread once backup disconnects, error or
@@ -158,7 +160,7 @@ void printServList(struct ServListSafe servList);
 // #RETURN : negative on error, otherwise ID of the command.
 // 	-1 : invalid/error
 // 	0 : exit command
-// 	1 : valid 
-int clientCommandExec(struct ServThread* clientThread, char *cmd, int cmdlen);
+// 	1 : valid
+int clientCommandExec(struct ServThread *clientThread, char *cmd, int cmdlen);
 
 #endif
