@@ -436,21 +436,21 @@ int leaderCommandExec(char *cmd, int cmdlen) {
 	}
 
 	// backup-list
-	if (strncmp(cmd, "backup-list", cmdlen) == 0) {
+	if (strncmp(buf[0], "backup-list", cmdlen) == 0) {
 		printServList(backupList);
 		free(*buf);
 		return 3;
 	}
 
 	// client-list
-	if (strncmp(cmd, "client-list", cmdlen) == 0) {
+	if (strncmp(buf[0], "client-list", cmdlen) == 0) {
 		printServList(clientList);
 		free(*buf);
 		return 4;
 	}
 
 	// send-id
-	if (arglen < 3 && strncmp(buf[0], "send-id", firstlen) == 0) {
+	if (arglen >= 3 && strncmp(buf[0], "send-id", firstlen) == 0) {
 		pthread_mutex_lock(&servMap.lock);
 		int id = strtol(buf[1], NULL, 10);
 		struct ServThread *servThread = NULL;

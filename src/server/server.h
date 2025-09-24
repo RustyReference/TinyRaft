@@ -1,5 +1,5 @@
 #ifndef SERVER_H
-#define LEADER_H
+#define SERVER_H
 
 #include "thread/thread.h"
 #include <sys/queue.h>
