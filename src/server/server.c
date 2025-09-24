@@ -367,11 +367,9 @@ int parseAndExecute(char* msg, int msglen) {
 		printf("PRINTING database contents\n");
 		print();
 	}
-
-	for(int i = 0; i<numParts; i++) {
+	/*for(int i = 0; i<numParts; i++) {
 		printf("buf[%d] = %s\n", i, buf[i]);
-
-	}
+	}*/
 
 	free(*buf);
 	return 0; // Successfully parsed
@@ -415,7 +413,7 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 		// directly parse and execute command
 		cmd -= firstlen;
 		int res = parseAndExecute(cmd, cmdlen);
-		if(res<=0) {
+		if(res<0) {
 			printf("ERROR Failed to parse command");
 			return -1;
 		}
@@ -431,12 +429,12 @@ int leaderCommandExec(char* cmd, int cmdlen) {
 	// backup-all
 	if(strncmp(buf[0], "backup-all", firstlen) == 0) {
 		broadcastMsg(backupList, cmd, 0);
-		//leaderCommandExec(cmd, strnlen(cmd, cmdlen)+1); // recursion at its finest!
-		int res = parseAndExecute(cmd, cmdlen);
-		if(res <= 0) {
+		leaderCommandExec(cmd, strnlen(cmd, cmdlen)+1); // recursion at its finest!
+		/*int res = parseAndExecute(cmd, cmdlen);
+		if(res < 0) {
 			printf("ERROR Failure parsing command");
 			return -1;
-		}
+		}*/
 		free(*buf);
 		return 1;
 	}

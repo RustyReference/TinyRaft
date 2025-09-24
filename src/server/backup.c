@@ -46,7 +46,8 @@ int main(int argc, char* argv[]) {
     char buf[255] = {0};
     int len = 0;
     while ((len = recv(sockfd, buf, 255, 0)) > 0) {
-        printf("%d:%s\n", len, buf);
+       	 int res = parseAndExecute(buf, len); // Parse and execute command on backup server
+	 printf("%d:%s\n", len, buf);
     }
     close(sockfd);
     return 0;
