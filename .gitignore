@@ -1,7 +1,6 @@
 *.ccls*
 .clang-format
 .vscode/
-compile_commands.json
 src/server/*.dSYM/
 src/server/backup
 src/server/test.c
