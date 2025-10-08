@@ -1,16 +1,12 @@
-#define _GNU_SOURCE
 #include "server.h"
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/wait.h>
 
-void printBackups();
-
 int main() {
-  
 	initServer();
-	db_init();
+
 	// get a server
 	struct ServInfo leaderServer;
 	if (!getLeader(&leaderServer, "9600")) {
@@ -24,19 +20,13 @@ int main() {
 		termServer();
 		return 0;
 	}
-
-	// TODO: Make it a real function instead of system() call.
-	printf("starting server at ");
-	fflush(STDIN_FILENO);
-	system("hostname -I");
+	char ipAddr[255];
+	inet_ntop(AF_INET6, &leaderServer.addr, ipAddr, 255);
+	printf("starting leader server at %s\n", ipAddr);
 
 	char buf[255];
 	while (fgets(buf, 255, stdin)) {
-		//*strchrnul(buf, '\n') = '\0';
-		char *end = strrchr(buf, '\n');
-		if (end) {
-			*end = '\0';
-		}
+		*strchrnul(buf, '\n') = '\0';
 		if (strncmp(buf, "exit", 255) == 0) {
 			break;
 		}

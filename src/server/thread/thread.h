@@ -1,6 +1,6 @@
-#ifndef SERVER_H
+#ifndef THREAD_H
 
-#define SERVER_H
+#define THREAD_H
 #define _Nullable
 
 #include <stdio.h>

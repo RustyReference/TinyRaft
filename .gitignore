@@ -1,2 +1,7 @@
 *.ccls*
 .clang-format
+.vscode/
+src/server/*.dSYM/
+src/server/backup
+src/server/test.c
+src/server/*
