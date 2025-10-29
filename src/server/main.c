@@ -26,9 +26,8 @@ int main() {
 	}
 
 	// TODO: Make it a real function instead of system() call.
-	printf("starting server at ");
-	fflush(STDIN_FILENO);
-	system("hostname -I");
+  printf("Starting server at:\n");
+  printIp();
 
 	char buf[255];
 	while (fgets(buf, 255, stdin)) {

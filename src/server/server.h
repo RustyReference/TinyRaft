@@ -5,6 +5,7 @@
 #include <sys/queue.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <ifaddrs.h>
 
 // Hold information about a server.
 struct ServInfo {
@@ -162,5 +163,8 @@ void printServList(struct ServListSafe servList);
 // 	0 : exit command
 // 	1 : valid
 int clientCommandExec(struct ServThread *clientThread, char *cmd, int cmdlen);
+
+// Print ip address of the local machine
+void printIp();
 
 #endif

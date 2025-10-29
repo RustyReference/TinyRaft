@@ -900,4 +900,39 @@ int backupCommandExec(struct ServThread *backupThread, char *cmd, int cmdlen) {
 	return -1;
 }
 
+// Print ip address of the local machine
+void printIp() {
+  // get addresses
+  struct ifaddrs *ifaddr;
+  if(getifaddrs(&ifaddr) == -1) {
+    printf("Could not get ip address\n");
+    return;
+  }
+
+  // go through each interface and look for ipv4 or ipv6 to print
+  char host[NI_MAXHOST];
+  for(struct ifaddrs* ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+    int family = ifa->ifa_addr->sa_family;
+    socklen_t len = 0;
+    // set length of socket
+    if(family == AF_INET) {
+      len = sizeof(struct sockaddr_in);
+    } else if(family == AF_INET6) {
+      len = sizeof(struct sockaddr_in6);
+    } else continue;
+    
+    // get name
+    int s = getnameinfo(ifa->ifa_addr, len, host, 
+        NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+    if(s != 0) continue;
+
+    // skip default localhost
+    if(strncmp(host, "127.0.0.1", 10) == 0) continue; 
+    if(strncmp(host, "::1", 10) == 0) continue; 
+    
+    // print address
+    printf("\t\t%s\n", host);
+  }
+}
+
 #endif
